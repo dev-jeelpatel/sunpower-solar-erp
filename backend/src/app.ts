@@ -10,6 +10,8 @@ import { prisma } from './lib/prisma';
 import { authenticate } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { authRouter } from './modules/auth/auth.routes';
+import { catalogRouter } from './modules/catalog/catalog.routes';
+import { customersRouter } from './modules/customers/customers.routes';
 import { enquiriesRouter, publicRouter } from './modules/enquiries/enquiries.routes';
 import { usersRouter } from './modules/users/users.routes';
 
@@ -43,6 +45,8 @@ app.use('/api/auth', authRouter);
 app.use('/api/public', publicRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/enquiries', enquiriesRouter);
+app.use('/api/catalog', catalogRouter);
+app.use('/api', customersRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
