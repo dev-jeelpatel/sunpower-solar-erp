@@ -4,6 +4,7 @@ import { del, get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { validate, required, minLen, positive } from '../validators';
+import * as V from '../validators';
 
 function LineModal({ t, onClose, onDone }) {
   const prods = useAsync(() => get('/catalog/products'));
@@ -24,9 +25,9 @@ function LineModal({ t, onClose, onDone }) {
       <div className="form-grid">
         <Field label="Type" className="full"><select {...f.bind('kind')}><option value="part">Spare part from stock</option><option value="labour">Labour / service charge</option></select></Field>
         {v.kind === 'part' ? <Field label="Part" error={f.errors.productId} className="full"><select value={v.productId} onChange={(e) => pick(e.target.value)}><option value="">Select…</option>{(prods.data || []).filter((p) => p.category !== 'service' && !p.tracked_serial).map((p) => <option key={p.product_id} value={p.product_id}>{p.name} ({p.on_hand} in stock)</option>)}</select></Field>
-          : <Field label="Description" error={f.errors.description} className="full"><input {...f.bind('description')} placeholder="e.g. Site visit & diagnosis" /></Field>}
-        <Field label="Quantity / hours" error={f.errors.quantity}><input type="number" step="0.5" {...f.bind('quantity')} /></Field>
-        <Field label="Rate (₹)" error={f.errors.unitPrice}><input type="number" {...f.bind('unitPrice')} /></Field>
+          : <Field label="Description" rules={[V.noMarkup('Description')]} error={f.errors.description} className="full"><input {...f.bind('description')} placeholder="e.g. Site visit & diagnosis" /></Field>}
+        <Field label="Quantity / hours" rules={[V.required('Quantity'), V.positive('Quantity'), V.range(0, 1000, 'Quantity')]} error={f.errors.quantity}><input type="number" step="0.5" {...f.bind('quantity')} /></Field>
+        <Field label="Rate (₹)" rules={[V.required('Rate'), V.moneyAmount('Rate', 0, 1000000)]} error={f.errors.unitPrice}><input type="number" {...f.bind('unitPrice')} /></Field>
       </div>
     </Modal>
   );
@@ -47,8 +48,8 @@ function ResolveModal({ t, onClose, onDone }) {
         {t.warranty_status === 'in_warranty' ? 'In warranty: this repair is free for the customer.' : 'Out of warranty: parts and labour lines will be billed automatically with GST.'}</div>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="stack">
-        <Field label="What was done" error={f.errors.resolution}><textarea {...f.bind('resolution')} /></Field>
-        {t.serial_no && <Field label="Replacement unit serial (if swapped)" error={f.errors.replacementSerial} hint="The faulty unit is marked faulty and the new unit gets a fresh warranty"><input className="mono" {...f.bind('replacementSerial')} onChange={(e) => f.set('replacementSerial', e.target.value.toUpperCase())} /></Field>}
+        <Field label="What was done" rules={[V.required('Resolution'), V.minLen(5, 'Resolution'), V.noMarkup('Resolution')]} error={f.errors.resolution}><textarea {...f.bind('resolution')} /></Field>
+        {t.serial_no && <Field label="Replacement unit serial (if swapped)" rules={[V.serialNo]} error={f.errors.replacementSerial} hint="The faulty unit is marked faulty and the new unit gets a fresh warranty"><input className="mono" {...f.bind('replacementSerial')} onChange={(e) => f.set('replacementSerial', e.target.value.toUpperCase())} /></Field>}
       </div>
     </Modal>
   );

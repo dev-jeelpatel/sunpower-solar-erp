@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, get, post, del } from '../api';
 import { useCurrentUser, can } from '../auth';
+import * as V from '../validators';
 import { Async, Badge, Card, Field, PageHead, fmtDateTime, money, useAction, useAsync, useToast } from '../components/ui';
 
 export default function DispatchDetail() {
@@ -26,6 +27,8 @@ export default function DispatchDetail() {
     e?.preventDefault();
     const s = (pick || serial).trim().toUpperCase();
     if (!s) return;
+    const bad = V.serialNo(s);
+    if (bad) { setScanMsg({ ok: false, text: bad }); return; }
     setScanMsg(null);
     try {
       setData(await post(`/dispatches/${id}/scan`, { serial: s }));
@@ -38,6 +41,8 @@ export default function DispatchDetail() {
   const unscan = async (s) => { if (await run(() => del(`/dispatches/${id}/scan/${s}`))) load(); };
   const send = async () => {
     if (!vehicle.trim()) return setVErr('Enter the vehicle number');
+    const bad = V.vehicleNo(vehicle);
+    if (bad) return setVErr(bad);
     setVErr('');
     try { setData(await post(`/dispatches/${id}/dispatch`, { vehicleNo: vehicle })); toast('Truck dispatched'); }
     catch (err) { setVErr(err.fields?.vehicleNo || err.message); }
@@ -89,7 +94,7 @@ export default function DispatchDetail() {
       {open && wh && (
         <div style={{ marginTop: 16 }}><Card title="Release to truck">
           <div className="row" style={{ alignItems: 'flex-start' }}>
-            <Field label="Vehicle number" error={vErr} className="grow"><input placeholder="GJ05AB1234" value={vehicle} onChange={(e) => setVehicle(e.target.value.toUpperCase())} /></Field>
+            <Field label="Vehicle number" error={vErr} className="grow" rules={[V.required('Vehicle number'), V.vehicleNo]}><input placeholder="GJ05AB1234" value={vehicle} onChange={(e) => setVehicle(e.target.value.toUpperCase())} /></Field>
             <button className="btn" style={{ marginTop: 24 }} disabled={!d.ready} onClick={send}>🚚 Dispatch</button>
           </div>
           {!d.ready && <p className="muted small" style={{ marginBottom: 0 }}>Dispatch is enabled once every serial-numbered item is scanned and bulk items are in stock.</p>}

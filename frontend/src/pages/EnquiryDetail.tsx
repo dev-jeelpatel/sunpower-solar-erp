@@ -7,6 +7,7 @@ import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, Seg, fmtDat
 import { Tracker } from '../components/kit';
 import { Icon } from '../components/icons';
 import { validate, required, positive, personName, addressText, cityName, safeText, email as emailRule, phone as phoneRule } from '../validators';
+import * as V from '../validators';
 
 const FLOW = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won'];
 const FLOW_LABEL: Record<string, string> = {
@@ -45,10 +46,10 @@ function QualifyModal({ e, onClose, onDone }) {
       <div className="form-grid">
         <Field label="Outcome" className="full"><select {...f.bind('decision')}>
           <option value="qualified">Looks good → proceed to site survey</option><option value="contacted">Spoke / need to call back</option><option value="not_suitable">Not suitable → close enquiry</option></select></Field>
-        <Field label="Shadow-free roof area (sq ft)" error={f.errors.shadowFreeSqft}><input type="number" min="0" {...f.bind('shadowFreeSqft')} /></Field>
-        <Field label="Monthly electricity bill (₹)" error={f.errors.monthlyBill}><input type="number" min="0" {...f.bind('monthlyBill')} /></Field>
+        <Field label="Shadow-free roof area (sq ft)" rules={[V.positive('Roof area'), V.wholeNumber('Roof area', 1, 100000)]} error={f.errors.shadowFreeSqft}><input type="number" min="0" {...f.bind('shadowFreeSqft')} /></Field>
+        <Field label="Monthly electricity bill (₹)" rules={[V.moneyAmount('Monthly bill', 0, 1000000)]} error={f.errors.monthlyBill}><input type="number" min="0" {...f.bind('monthlyBill')} /></Field>
         <Field label="Grid connection suitable?" error={f.errors.gridSuitable}><select {...f.bind('gridSuitable')}><option value="">Select…</option><option value="true">Yes</option><option value="false">No</option></select></Field>
-        <Field label="Notes" className="full"><textarea {...f.bind('notes')} /></Field>
+        <Field label="Notes" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
       </div>
     </Modal>
   );
@@ -158,7 +159,7 @@ function QuoteModal({ e, onClose }) {
 
         <div className="qm-step"><b><i>4</i>Discount and total</b>
           <div className="form-grid">
-            <Field label="Discount (₹)" error={err.discount}><input type="number" min="0" value={discount} onChange={(ev) => setDiscount(ev.target.value)} /></Field>
+            <Field label="Discount (₹)" rules={[V.moneyAmount('Discount', 0, 100000000)]} error={err.discount}><input type="number" min="0" value={discount} onChange={(ev) => setDiscount(ev.target.value)} /></Field>
             <dl className="qm-total">
               <dt>Package</dt><dd>{money(pkg?.list_price || 0)}</dd>
               {extraTotal > 0 && <><dt>Extra items</dt><dd>{money(extraTotal)}</dd></>}
@@ -180,7 +181,7 @@ function ReviewModal({ s, onClose, onDone }) {
   return (
     <Modal title="Review survey" onClose={onClose} footer={<><button className="btn danger" disabled={busy} onClick={() => go('reject')}>Reject</button><button className="btn ok" disabled={busy} onClick={() => go('approve')}>Approve</button></>}>
       <dl className="kv"><dt>Roof direction</dt><dd>{s.roof_direction}</dd><dt>Tilt</dt><dd>{s.roof_tilt_deg}°</dd><dt>Cable distance</dt><dd>{s.cable_distance_m} m</dd><dt>Usable area</dt><dd>{s.usable_area_sqft} sq ft</dd><dt>Technician notes</dt><dd>{s.notes || '-'}</dd></dl>
-      <Field label="Review notes" className="full"><textarea {...f.bind('notes')} /></Field>
+      <Field label="Review notes" rules={[V.safeText('Review notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
     </Modal>
   );
 }
@@ -199,14 +200,14 @@ function EditEnquiry({ e, onClose, onDone }) {
     <Modal title="Edit enquiry" onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Save changes</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Name" error={f.errors.name}><input {...f.bind('name')} /></Field>
-        <Field label="Mobile number" error={f.errors.phone}><input {...f.bind('phone')} /></Field>
-        <Field label="Email" error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
-        <Field label="City"><input {...f.bind('city')} /></Field>
-        <Field label="Address" className="full" error={f.errors.address}><input {...f.bind('address')} /></Field>
+        <Field label="Name" rules={[V.required('Name'), V.personName('Name')]} error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Mobile number" rules={[V.required('Mobile number'), V.phone]} error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Email" rules={[V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="City" rules={[V.cityName]}><input {...f.bind('city')} /></Field>
+        <Field label="Address" rules={[V.required('Address'), V.addressText('Address')]} className="full" error={f.errors.address}><input {...f.bind('address')} /></Field>
         <Field label="System size (kW)"><select {...f.bind('requestedKw')}>{[1, 2, 3, 4, 5].map((k) => <option key={k} value={k}>{k} kW</option>)}</select></Field>
         <Field label="System type"><select {...f.bind('systemType')}><option value="on_grid">On-grid</option><option value="off_grid">Off-grid</option></select></Field>
-        <Field label="Message" className="full"><input {...f.bind('message')} /></Field>
+        <Field label="Message" rules={[V.safeText('Message', 500)]} className="full"><input {...f.bind('message')} /></Field>
         <label className="check full"><input type="checkbox" checked={f.values.subsidyRequired} onChange={(ev) => f.set('subsidyRequired', ev.target.checked)} /> Customer wants the government subsidy</label>
       </div>
     </Modal>

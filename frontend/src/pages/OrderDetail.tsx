@@ -6,6 +6,7 @@ import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { Tracker } from '../components/kit';
 import { validate, required, positive } from '../validators';
+import * as V from '../validators';
 
 export function PaymentModal({ invoice, onClose, onDone, remaining }) {
   const f = useForm({ amount: remaining ? String(remaining) : '', method: 'upi', reference: '' });
@@ -22,9 +23,9 @@ export function PaymentModal({ invoice, onClose, onDone, remaining }) {
     <Modal title={`Record payment · ${invoice.invoice_no}`} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save payment</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Amount (₹)" required error={f.errors.amount} hint={`Balance due ${money(remaining, true)}`}><input type="number" step="0.01" inputMode="decimal" {...f.bind('amount')} /></Field>
+        <Field label="Amount (₹)" rules={[V.required('Amount'), V.moneyAmount('Amount', 1, 100000000)]} required error={f.errors.amount} hint={`Balance due ${money(remaining, true)}`}><input type="number" step="0.01" inputMode="decimal" {...f.bind('amount')} /></Field>
         <Field label="Method"><select {...f.bind('method')}>{['upi', 'cash', 'bank_transfer', 'cheque', 'card'].map((m) => <option key={m} value={m}>{label(m)}</option>)}</select></Field>
-        <Field label="Reference / UTR" className="full" error={f.errors.reference}><input {...f.bind('reference')} /></Field>
+        <Field label="Reference / UTR" rules={[V.safeText('Reference', 60)]} className="full" error={f.errors.reference}><input {...f.bind('reference')} /></Field>
       </div>
     </Modal>
   );

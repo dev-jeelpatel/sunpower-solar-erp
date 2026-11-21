@@ -5,6 +5,7 @@ import { Async, Badge, Card, Confirm, Field, Modal, PageHead, Tabs, label, money
 import { Chips, Kpi, KpiRow, Meter, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
 import { validate, required, minLen } from '../validators';
+import * as V from '../validators';
 
 const CATS = ['panel', 'inverter', 'battery', 'charge_controller', 'wiring_box', 'switch', 'earthing', 'stand', 'cable', 'connector', 'service'];
 
@@ -13,7 +14,7 @@ function ProductForm({ p, onClose, onDone }) {
   const { run, busy, error } = useAction(f.setErrors);
   const v = f.values;
   const submit = async () => {
-    const errs = validate(v, { sku: [required('SKU')], name: [required('Name'), minLen(3, 'Name')], costPrice: [required('Cost price')], sellPrice: [required('Selling price')] });
+    const errs = validate(v, { sku: [required('SKU'), V.skuCode], name: [required('Name'), minLen(3, 'Name'), V.noMarkup('Name')], costPrice: [required('Cost price'), V.moneyAmount('Cost price', 0, 10000000)], sellPrice: [required('Selling price'), V.moneyAmount('Selling price', 0, 10000000)], warrantyMonths: [V.wholeNumber('Warranty', 0, 600)], reorderLevel: [V.wholeNumber('Reorder level', 0, 100000)] });
     if (!errs.sellPrice && Number(v.sellPrice) < Number(v.costPrice)) errs.sellPrice = 'Selling price is below cost price';
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -24,13 +25,13 @@ function ProductForm({ p, onClose, onDone }) {
     <Modal title={p ? 'Edit product' : 'New product'} onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="SKU" error={f.errors.sku}><input {...f.bind('sku')} style={{ textTransform: 'uppercase' }} /></Field>
+        <Field label="SKU" rules={[V.required('SKU'), V.skuCode]} error={f.errors.sku}><input {...f.bind('sku')} style={{ textTransform: 'uppercase' }} /></Field>
         <Field label="Category" error={f.errors.category}><select {...f.bind('category')}>{CATS.map((c) => <option key={c} value={c}>{label(c)}</option>)}</select></Field>
-        <Field label="Name" className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
-        <Field label="Cost price (₹)" error={f.errors.costPrice}><input type="number" min="0" {...f.bind('costPrice')} /></Field>
-        <Field label="Selling price (₹)" error={f.errors.sellPrice}><input type="number" min="0" {...f.bind('sellPrice')} /></Field>
-        <Field label="Warranty (months)" hint="Starts automatically at delivery" error={f.errors.warrantyMonths}><input type="number" min="0" {...f.bind('warrantyMonths')} /></Field>
-        <Field label="Reorder level" error={f.errors.reorderLevel}><input type="number" min="0" {...f.bind('reorderLevel')} /></Field>
+        <Field label="Name" rules={[V.required('Name'), V.minLen(3, 'Name'), V.noMarkup('Name')]} className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Cost price (₹)" rules={[V.required('Cost price'), V.moneyAmount('Cost price', 0, 10000000)]} error={f.errors.costPrice}><input type="number" min="0" {...f.bind('costPrice')} /></Field>
+        <Field label="Selling price (₹)" rules={[V.required('Selling price'), V.moneyAmount('Selling price', 0, 10000000)]} error={f.errors.sellPrice}><input type="number" min="0" {...f.bind('sellPrice')} /></Field>
+        <Field label="Warranty (months)" rules={[V.wholeNumber('Warranty', 0, 600)]} hint="Starts automatically at delivery" error={f.errors.warrantyMonths}><input type="number" min="0" {...f.bind('warrantyMonths')} /></Field>
+        <Field label="Reorder level" rules={[V.wholeNumber('Reorder level', 0, 100000)]} error={f.errors.reorderLevel}><input type="number" min="0" {...f.bind('reorderLevel')} /></Field>
         <label className="check full"><input type="checkbox" checked={v.trackedSerial} onChange={(e) => f.set('trackedSerial', e.target.checked)} /> Track each unit by serial number</label>
       </div>
     </Modal>
@@ -58,10 +59,10 @@ function PackageForm({ pkg, products, onClose, onDone }) {
     <Modal title={pkg ? 'Edit package' : 'New package'} onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Package name" className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Package name" rules={[V.required('Package name'), V.minLen(3, 'Package name'), V.noMarkup('Package name')]} className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
         <Field label="Type"><select {...f.bind('kind')}><option value="on_grid">On-grid</option><option value="off_grid">Off-grid</option><option value="hardware">Hardware</option><option value="service">Service</option></select></Field>
-        {grid && <Field label="Capacity (kW)" error={f.errors.capacityKw}><input type="number" min="1" max="5" {...f.bind('capacityKw')} /></Field>}
-        <Field label="Description" className="full"><input {...f.bind('description')} /></Field>
+        {grid && <Field label="Capacity (kW)" rules={[V.wholeNumber('Capacity', 1, 5)]} error={f.errors.capacityKw}><input type="number" min="1" max="5" {...f.bind('capacityKw')} /></Field>}
+        <Field label="Description" rules={[V.safeText('Description', 500)]} className="full"><input {...f.bind('description')} /></Field>
       </div>
       <h4 style={{ margin: '16px 0 8px' }}>Parts in this package</h4>
       <div className="stack">

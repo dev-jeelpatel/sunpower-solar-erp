@@ -357,6 +357,23 @@ List endpoints accept `page`, `limit` (max 100) and filters such as `status` and
 
 ---
 
+## Input validation and error handling
+
+Every value is checked twice: in the browser for instant feedback, and on the server, which never trusts the browser.
+
+**In the forms**
+- A mistake is flagged as soon as you leave the box, in plain words under that box (for example "Please enter a valid email address (e.g. name@example.com)"), and the message disappears once you start fixing it.
+- On submit every problem is shown at once; the server's per-field messages are placed under the matching box too.
+- Rules: names (letters, spaces and `. ' -` only), city, address (needs a real word), Indian mobile numbers (rejects fake-looking ones), email format, SKU and serial-number format, vehicle number, money amounts (two decimals at most, sensible limits), whole numbers within a range, and no `<` or `>` in free text.
+
+**On the server**
+- Every write endpoint validates its body with a schema; list endpoints sanitise search text and page numbers. A fuzz run with garbage ids, bodies and query strings returned no 5xx responses.
+- Technical messages are replaced by plain ones (zod defaults, database constraint errors, malformed JSON, oversized requests).
+
+**When something goes wrong**
+- Network down, timeout, expired session, no permission, too many attempts and server errors each give a clear message and never a raw error.
+- If a page crashes while rendering, a calm screen offers Reload / Go to the start, and clears itself when you navigate elsewhere.
+
 ## Security
 
 - Passwords are hashed with bcrypt; sessions use signed JWTs (`JWT_EXPIRES_IN`, default 12 h).
@@ -415,7 +432,7 @@ The web dev server proxies `/api` and `/uploads` to `http://localhost:4000` (see
 | `npm run db:seed` | Load demo data into an empty database |
 | `npm run db:setup` | Migrate, then seed |
 | `npm run prisma:generate` | Regenerate the Prisma client |
-| `npm run e2e` | Run the end-to-end check against the running API |
+| `npm run e2e -- --confirm` | Run the end-to-end check against the running API. It writes test data, so use a throwaway database |
 
 **frontend**
 
@@ -430,7 +447,7 @@ The web dev server proxies `/api` and `/uploads` to `http://localhost:4000` (see
 
 ## Testing
 
-`npm run e2e` (in `backend`, with the API and database running) walks the whole business flow over HTTP and prints
+`npm run e2e -- --confirm` (in `backend`, with the API and a throwaway database running; it adds test records) walks the whole business flow over HTTP and prints
 **73 checks**: login and roles, enquiry to qualification, survey, quote and order, payment confirming the order,
 dispatch with serial scanning, delivery, installation sign-off, tickets in and out of warranty, director reports, and
 the negative cases (duplicate serial, invalid vehicle number, wrong role, over-payment, and so on).

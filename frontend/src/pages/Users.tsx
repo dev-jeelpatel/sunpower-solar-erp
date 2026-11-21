@@ -5,6 +5,7 @@ import { Async, Badge, Card, Confirm, Field, Modal, PageHead, label, money, useA
 import { Chips, Kpi, KpiRow, Person, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
 import { validate, required, minLen, personName, email, phone } from '../validators';
+import * as V from '../validators';
 
 const ROLES = ['admin', 'sales', 'technician', 'warehouse', 'support', 'director'];
 
@@ -23,12 +24,12 @@ function NewUser({ onClose, onDone }) {
     <Modal title="Add staff member" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Create</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Name" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Name" rules={[V.required('Name'), V.personName('Name')]} error={f.errors.name}><input {...f.bind('name')} /></Field>
         <Field label="Role"><select {...f.bind('role')}>{ROLES.map((r) => <option key={r} value={r}>{label(r)}</option>)}</select></Field>
-        <Field label="Email" error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
-        <Field label="Phone" error={f.errors.phone}><input {...f.bind('phone')} /></Field>
-        <Field label="Temporary password" error={f.errors.password}><input type="password" autoComplete="new-password" {...f.bind('password')} /></Field>
-        {f.values.role === 'technician' && <Field label="Hourly rate (₹)"><input type="number" min="0" {...f.bind('hourlyRate')} /></Field>}
+        <Field label="Email" rules={[V.required('Email'), V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="Phone" rules={[V.phone]} error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Temporary password" rules={[V.required('Password'), V.minLen(8, 'Password'), (x: any) => (x && (!/[A-Za-z]/.test(x) || !/\d/.test(x)) ? 'Password needs a letter and a number' : null)]} error={f.errors.password}><input type="password" autoComplete="new-password" {...f.bind('password')} /></Field>
+        {f.values.role === 'technician' && <Field label="Hourly rate (₹)" rules={[V.moneyAmount('Hourly rate', 0, 10000)]}><input type="number" min="0" {...f.bind('hourlyRate')} /></Field>}
       </div>
     </Modal>
   );
@@ -51,12 +52,12 @@ function EditUser({ u, me, onClose, onDone }) {
     <Modal title={`Edit ${u.name}`} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Name" error={f.errors.name}><input {...f.bind('name')} /></Field>
-        <Field label="Email" error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
-        <Field label="Phone (optional)" error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Name" rules={[V.required('Name'), V.personName('Name')]} error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Email" rules={[V.required('Email'), V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="Phone (optional)" rules={[V.phone]} error={f.errors.phone}><input {...f.bind('phone')} /></Field>
         <Field label="Role" error={f.errors.role} hint={u.id === me ? 'You cannot change your own role' : 'Changes what this person can see and do after their next sign-in'}><select {...f.bind('role')} disabled={u.id === me}>{ROLES.map((r) => <option key={r} value={r}>{label(r)}</option>)}</select></Field>
-        {f.values.role === 'technician' && <Field label="Hourly rate (₹)"><input type="number" min="0" {...f.bind('hourlyRate')} /></Field>}
-        <Field label="New password" hint="Leave blank to keep the current one" error={f.errors.password}><input type="password" autoComplete="new-password" {...f.bind('password')} /></Field>
+        {f.values.role === 'technician' && <Field label="Hourly rate (₹)" rules={[V.moneyAmount('Hourly rate', 0, 10000)]}><input type="number" min="0" {...f.bind('hourlyRate')} /></Field>}
+        <Field label="New password" rules={[(x: any) => (x && (x.length < 8 || !/[A-Za-z]/.test(x) || !/\d/.test(x)) ? 'At least 8 characters with a letter and a number' : null)]} hint="Leave blank to keep the current one" error={f.errors.password}><input type="password" autoComplete="new-password" {...f.bind('password')} /></Field>
       </div>
     </Modal>
   );

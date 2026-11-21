@@ -6,6 +6,7 @@ import { Async, Badge, Card, Empty, Field, Modal, PageHead, fmtDate, label, mone
 import { Chips, Kpi, KpiRow, Person, Stepper, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
 import { validate, required } from '../validators';
+import * as V from '../validators';
 
 const NEXT = { documents_pending: ['submitted'], submitted: ['approved', 'rejected'], approved: ['disbursed'] };
 
@@ -26,9 +27,9 @@ function Update({ s, onClose, onDone }) {
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
         <Field label="Move to" className="full"><select {...f.bind('status')}>{next.map((n) => <option key={n} value={n}>{label(n)}</option>)}</select></Field>
-        <Field label="Portal reference no." error={f.errors.referenceNo}><input {...f.bind('referenceNo')} /></Field>
-        {['approved', 'disbursed'].includes(v.status) && <Field label="Approved amount (₹)" error={f.errors.approvedAmount}><input type="number" {...f.bind('approvedAmount')} /></Field>}
-        <Field label="Notes" className="full"><textarea {...f.bind('notes')} /></Field>
+        <Field label="Portal reference no." rules={[V.safeText('Reference number', 60)]} error={f.errors.referenceNo}><input {...f.bind('referenceNo')} /></Field>
+        {['approved', 'disbursed'].includes(v.status) && <Field label="Approved amount (₹)" rules={[V.moneyAmount('Approved amount', 0, 100000000)]} error={f.errors.approvedAmount}><input type="number" {...f.bind('approvedAmount')} /></Field>}
+        <Field label="Notes" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
       </div>
     </Modal>
   );

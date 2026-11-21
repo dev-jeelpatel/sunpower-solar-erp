@@ -6,6 +6,7 @@ import ScheduleTech from '../components/ScheduleTech';
 import SignaturePad from '../components/SignaturePad';
 import { Async, Badge, Card, Field, PageHead, fmtDate, fmtDateTime, money, toLocalInput, useAction, useAsync, useForm, useToast } from '../components/ui';
 import { validate, required, range, minLen } from '../validators';
+import * as V from '../validators';
 
 /** Mobile-first completion form used by the crew on site. */
 function CompleteForm({ job, onDone }) {
@@ -55,8 +56,8 @@ function CompleteForm({ job, onDone }) {
       <div className="form-grid">
         <Field label="Work started" required error={f.errors.startedAt}><input type="datetime-local" {...f.bind('startedAt')} /></Field>
         <Field label="Work finished" required error={f.errors.finishedAt}><input type="datetime-local" max={toLocalInput()} {...f.bind('finishedAt')} /></Field>
-        <Field label="Installed system size (kW)" required error={f.errors.confirmedKw} hint={job.capacity_kw ? `Ordered: ${job.capacity_kw} kW` : ''}><input type="number" step="0.1" inputMode="decimal" {...f.bind('confirmedKw')} /></Field>
-        <Field label="Notes" error={f.errors.notes}><input {...f.bind('notes')} placeholder="Anything the customer should know" /></Field>
+        <Field label="Installed system size (kW)" rules={[V.required('System size'), V.range(0.5, 10, 'System size')]} required error={f.errors.confirmedKw} hint={job.capacity_kw ? `Ordered: ${job.capacity_kw} kW` : ''}><input type="number" step="0.1" inputMode="decimal" {...f.bind('confirmedKw')} /></Field>
+        <Field label="Notes" rules={[V.safeText('Notes', 1000)]} error={f.errors.notes}><input {...f.bind('notes')} placeholder="Anything the customer should know" /></Field>
       </div>
 
       <Field label="Photos of the finished roof" required error={f.errors.photos} hint="Take photos with your phone camera or pick from gallery (JPG/PNG/WebP, 5 MB max each)">
@@ -65,7 +66,7 @@ function CompleteForm({ job, onDone }) {
       <Photos job={job} onDone={onDone} editable />
 
       <div className="stack" style={{ gap: 8 }}>
-        <Field label="Customer name" required error={f.errors.signerName}><input {...f.bind('signerName')} /></Field>
+        <Field label="Customer name" rules={[V.required('Customer name'), V.personName('Customer name')]} required error={f.errors.signerName}><input {...f.bind('signerName')} /></Field>
         <Field label="Customer signature (accepts the completed work)" required error={sigErr}><SignaturePad ref={sig} onChange={() => setSigErr('')} /></Field>
         <div><button type="button" className="btn secondary sm" onClick={() => sig.current.clear()}>Clear signature</button></div>
       </div>
