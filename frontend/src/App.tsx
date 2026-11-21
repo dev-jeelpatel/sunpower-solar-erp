@@ -7,6 +7,7 @@ import { Loading } from './components/ui';
 // Route-level code splitting keeps the first load small
 const Login = lazy(() => import('./pages/Login.tsx'));
 const Home = lazy(() => import('./pages/Home.tsx'));
+const GridGuide = lazy(() => import('./pages/GridGuide.tsx'));
 const PublicEnquiry = lazy(() => import('./pages/PublicEnquiry.tsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.tsx'));
 const Enquiries = lazy(() => import('./pages/Enquiries.tsx'));
@@ -45,6 +46,7 @@ export default function App() {
     <Suspense fallback={<Loading />}>
       <Routes>
         <Route path="/home" element={<Home />} />
+        <Route path="/grid-guide" element={<GridGuide />} />
         <Route path="/enquire" element={<PublicEnquiry />} />
         <Route path="/login" element={<Login />} />
         <Route element={<Protected><Layout /></Protected>}>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { get, post, ApiError } from '../api';
 import EnquiryForm from '../components/EnquiryForm';
 import { useAuth } from '../auth';
@@ -114,6 +114,7 @@ function Nav({ scrolled }: { scrolled: boolean }) {
           <button onClick={() => go('solutions')}>Solutions</button>
           <button onClick={() => go('savings')}>Savings</button>
           <button onClick={() => go('subsidy')}>Subsidy</button>
+          <Link to="/grid-guide" onClick={() => setOpen(false)}>Grid guide</Link>
           <button onClick={() => go('why')}>Why SunPower</button>
           <button onClick={() => go('faq')}>FAQ</button>
           <Link className="staff" to={user ? '/' : '/login'}>{user ? 'Open dashboard' : 'Staff login'}</Link>
@@ -583,7 +584,14 @@ function Head({ eyebrow, title, sub, left, light }: { eyebrow: string; title: Re
 }
 
 export default function Home() {
-  const [sel, setSel] = useState<QuotePick>({ kw: '3', type: 'on_grid' });
+  const [qs] = useSearchParams();
+  const { hash } = useLocation();
+  const [sel, setSel] = useState<QuotePick>({
+    kw: ['1', '2', '3', '4', '5'].includes(qs.get('kw') || '') ? (qs.get('kw') as string) : '3',
+    type: qs.get('type') === 'off_grid' ? 'off_grid' : 'on_grid',
+  });
+  // links from other pages, e.g. /home#savings or /home?type=off_grid#quote
+  useEffect(() => { if (hash) { const t = setTimeout(() => scrollTo(hash.slice(1)), 350); return () => clearTimeout(t); } }, [hash]);
   const { y, pct } = useScroll();
   useReveal();
   useEffect(() => { document.title = 'SunPower Solutions | Rooftop solar for your home'; return () => { document.title = 'SunPower Solar ERP'; }; }, []);
