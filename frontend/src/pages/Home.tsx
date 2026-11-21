@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { get, ApiError } from '../api';
+import { get, post, ApiError } from '../api';
 import EnquiryForm from '../components/EnquiryForm';
 import { useAuth } from '../auth';
 import { fmtDate, money } from '../components/ui';
@@ -364,7 +364,32 @@ function Why() {
   );
 }
 
+interface WarrantyUnit { product_name: string; serial_no: string; warranty_end: string | null; warranty_months: number; warranty_state: string; days_left: number }
+
+/** Customers can check their warranty by mobile number (with a one-time code) or by serial number. */
 function Warranty() {
+  const [mode, setMode] = useState<'mobile' | 'serial'>('mobile');
+  return (
+    <section id="warranty" className="sec alt"><div className="wrap two">
+      <div className="rv">
+        <Head left eyebrow="Already a customer?" title="Check your warranty in seconds" sub="Use the mobile number you gave us, or the serial number printed on your panel, inverter or battery. No account needed." />
+        <ul className="ticks dark">
+          <li><Ico n="check" /> Every panel, inverter and battery you own, in one list</li>
+          <li><Ico n="check" /> A quick one-time code keeps your details private</li>
+        </ul>
+      </div>
+      <div className="card-site rv" style={{ '--d': '120ms' } as any}>
+        <div className="wtabs" role="tablist">
+          <button className={mode === 'mobile' ? 'on' : ''} onClick={() => setMode('mobile')} role="tab" aria-selected={mode === 'mobile'}><Ico n="phone" />Mobile number</button>
+          <button className={mode === 'serial' ? 'on' : ''} onClick={() => setMode('serial')} role="tab" aria-selected={mode === 'serial'}><Ico n="search" />Serial number</button>
+        </div>
+        {mode === 'mobile' ? <WarrantyByMobile /> : <WarrantyBySerial />}
+      </div>
+    </div></section>
+  );
+}
+
+function WarrantyBySerial() {
   const [serial, setSerial] = useState('');
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<any>(null);
@@ -378,26 +403,122 @@ function Warranty() {
   };
   const state = res?.warranty_state;
   return (
-    <section id="warranty" className="sec alt"><div className="wrap two">
-      <div className="rv">
-        <Head left eyebrow="Already a customer?" title="Check your warranty in seconds" sub="Enter the serial number printed on your panel, inverter or battery to see your warranty status." />
+    <>
+      <form onSubmit={check} className="lookup">
+        <input placeholder="e.g. SP-INV3K-004093" value={serial} onChange={(e) => setSerial(e.target.value)} aria-label="Serial number" />
+        <button className="s-btn primary" disabled={busy || serial.trim().length < 6}>{busy ? 'Checking…' : 'Check'}</button>
+      </form>
+      {err && <div className="alert bad" style={{ marginTop: 12 }}>{err}</div>}
+      {res && (
+        <div className={`result ${state}`}>
+          <b>{res.product_name}</b>
+          {state === 'in_warranty' && <p>In warranty until <b>{fmtDate(res.warranty_end)}</b> ({res.days_left} days left).</p>}
+          {state === 'expired' && <p>Warranty ended on <b>{fmtDate(res.warranty_end)}</b>. Paid service is still available.</p>}
+          {state === 'not_started' && <p>Warranty starts when the equipment is delivered to you.</p>}
+        </div>
+      )}
+    </>
+  );
+}
+
+function WarrantyByMobile() {
+  const [step, setStep] = useState<'phone' | 'code' | 'result'>('phone');
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [demoCode, setDemoCode] = useState('');
+  const [wait, setWait] = useState(0); // seconds until a new code can be requested
+  const [data, setData] = useState<{ customerName: string; units: WarrantyUnit[] } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const t = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(t);
+  }, [wait]);
+
+  const digits = phone.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+  const phoneOk = /^[6-9]\d{9}$/.test(digits);
+
+  const sendCode = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!phoneOk) { setErr('Enter a valid 10-digit mobile number.'); return; }
+    setBusy(true); setErr('');
+    try {
+      const r = await post<{ demoCode?: string }>('/public/warranty/otp', { phone: digits });
+      setDemoCode(r.demoCode || ''); setCode(''); setStep('code'); setWait(30);
+    } catch (x) { setErr(x instanceof ApiError ? x.message : 'Could not send the code. Please try again.'); }
+    finally { setBusy(false); }
+  };
+
+  const verify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setErr('');
+    try { setData(await post('/public/warranty/verify', { phone: digits, code })); setStep('result'); }
+    catch (x) { setErr(x instanceof ApiError ? x.message : 'Could not verify the code. Please try again.'); }
+    finally { setBusy(false); }
+  };
+
+  const reset = () => { setStep('phone'); setCode(''); setDemoCode(''); setErr(''); setData(null); setOpen(null); };
+
+  if (step === 'result' && data) {
+    // Group identical items (for example six panels with the same dates) into one row
+    const groups = new Map<string, WarrantyUnit[]>();
+    data.units.forEach((u) => { const k = `${u.product_name}|${u.warranty_end}|${u.warranty_state}`; groups.set(k, [...(groups.get(k) || []), u]); });
+    const live = data.units.filter((u) => u.warranty_state === 'in_warranty').length;
+    return (
+      <div className="wres">
+        <div className="wres-head">
+          <div><b>Hello, {data.customerName}</b><span>{data.units.length ? `${live} of ${data.units.length} items are under warranty` : 'No equipment is registered to this number yet'}</span></div>
+          <button className="linkbtn" onClick={reset}>Check another number</button>
+        </div>
+        {[...groups.entries()].map(([k, list]) => {
+          const u = list[0];
+          const term = Math.max(1, Number(u.warranty_months) * 30.4);
+          const pct = u.warranty_state === 'in_warranty' ? Math.min(100, Math.round((u.days_left / term) * 100)) : 0;
+          return (
+            <div key={k} className={`wgroup ${u.warranty_state}`}>
+              <div className="wg-top">
+                <div><b>{list.length > 1 ? `${list.length} × ` : ''}{u.product_name}</b>
+                  <small>{u.warranty_state === 'in_warranty' ? `Under warranty until ${fmtDate(u.warranty_end)}` : u.warranty_state === 'expired' ? `Warranty ended ${fmtDate(u.warranty_end)}` : 'Warranty starts on delivery'}</small></div>
+                <span className="wg-badge">{u.warranty_state === 'in_warranty' ? 'In warranty' : u.warranty_state === 'expired' ? 'Expired' : 'Not started'}</span>
+              </div>
+              {u.warranty_state === 'in_warranty' && <div className="wg-bar"><i style={{ width: `${pct}%` }} /><span>{u.days_left.toLocaleString('en-IN')} days left</span></div>}
+              <button className="linkbtn" onClick={() => setOpen(open === k ? null : k)}>{open === k ? 'Hide' : 'Show'} serial number{list.length > 1 ? 's' : ''}</button>
+              {open === k && <div className="wg-serials">{list.map((x) => <code key={x.serial_no}>{x.serial_no}</code>)}</div>}
+            </div>
+          );
+        })}
+        <p className="small muted" style={{ margin: '10px 0 0' }}>Need help with any item? Contact us and quote the serial number.</p>
       </div>
-      <div className="card-site rv" style={{ '--d': '120ms' } as any}>
-        <form onSubmit={check} className="lookup">
-          <input placeholder="e.g. SP-INV3K-004093" value={serial} onChange={(e) => setSerial(e.target.value)} aria-label="Serial number" />
-          <button className="s-btn primary" disabled={busy || serial.trim().length < 6}>{busy ? 'Checking…' : 'Check'}</button>
-        </form>
-        {err && <div className="alert bad" style={{ marginTop: 12 }}>{err}</div>}
-        {res && (
-          <div className={`result ${state}`}>
-            <b>{res.product_name}</b>
-            {state === 'in_warranty' && <p>In warranty until <b>{fmtDate(res.warranty_end)}</b> ({res.days_left} days left).</p>}
-            {state === 'expired' && <p>Warranty ended on <b>{fmtDate(res.warranty_end)}</b>. Paid service is still available.</p>}
-            {state === 'not_started' && <p>Warranty starts when the equipment is delivered to you.</p>}
-          </div>
-        )}
-      </div>
-    </div></section>
+    );
+  }
+
+  if (step === 'code') {
+    return (
+      <form onSubmit={verify} className="otp">
+        <p className="otp-lead">We sent a 6-digit code by SMS to <b>+91 {digits}</b>.</p>
+        {demoCode && <div className="demo-note"><b>Demo mode:</b> SMS is switched off, so your code is <code>{demoCode}</code>.</div>}
+        <input className="otp-input" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6} placeholder="••••••" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} aria-label="6-digit code" />
+        {err && <div className="alert bad">{err}</div>}
+        <button className="s-btn primary block" disabled={busy || code.length !== 6}>{busy ? 'Checking…' : 'Show my warranty'}</button>
+        <div className="otp-links">
+          <button type="button" className="linkbtn" onClick={() => { setStep('phone'); setErr(''); }}>Change number</button>
+          <button type="button" className="linkbtn" disabled={wait > 0 || busy} onClick={() => sendCode()}>{wait > 0 ? `Resend code in ${wait}s` : 'Resend code'}</button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <form onSubmit={sendCode} className="otp">
+      <label className="otp-lead" htmlFor="w-phone">Your registered mobile number</label>
+      <div className="phone-box"><span>+91</span><input id="w-phone" inputMode="tel" autoComplete="tel" placeholder="98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+      {err && <div className="alert bad">{err}</div>}
+      <button className="s-btn primary block" disabled={busy || !phoneOk}>{busy ? 'Sending…' : 'Send me a code'}</button>
+      <p className="small muted" style={{ margin: 0 }}>Use the number you gave when you ordered. We text a one-time code to confirm it is you.</p>
+    </form>
   );
 }
 

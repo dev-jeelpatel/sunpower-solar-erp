@@ -339,3 +339,34 @@ html { scroll-padding-top: 80px; }
   .hero-site .hero-grid { width: 100%; }
   .hero-scroll { bottom: 124px; }
 }
+
+/* ---------- warranty check: mobile number + serial tabs ---------- */
+.wtabs { display: flex; gap: 4px; padding: 4px; margin-bottom: 18px; background: #eef1f8; border-radius: 12px; }
+.wtabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 12px; border: 0; background: none; border-radius: 9px; font-weight: 700; font-size: .88rem; color: var(--s-muted); cursor: pointer; }
+.wtabs button svg { width: 16px; height: 16px; } .wtabs button.on { background: #fff; color: var(--s-ink); box-shadow: 0 2px 8px rgba(15, 23, 42, .1); }
+.otp { display: grid; gap: 14px; }
+.otp-lead { font-size: .92rem; color: var(--s-text); margin: 0; font-weight: 600; } .otp-lead b { color: var(--s-ink); }
+.phone-box { display: flex; align-items: center; border: 2px solid var(--s-line); border-radius: 14px; background: #fff; transition: border-color .15s, box-shadow .15s; }
+.phone-box:focus-within { border-color: var(--s-sun); box-shadow: 0 0 0 4px rgba(245, 158, 11, .2); }
+.phone-box span { padding: 0 4px 0 16px; font-weight: 700; color: var(--s-muted); }
+.phone-box input { border: 0; box-shadow: none; background: transparent; font-size: 1.2rem; font-weight: 700; letter-spacing: .04em; padding: 14px 14px 14px 8px; min-height: 0; }
+.phone-box input:focus { outline: none; box-shadow: none; }
+.otp-input { text-align: center; font-size: 1.7rem; font-weight: 800; letter-spacing: .5em; padding: 14px 10px 14px 20px; border: 2px solid var(--s-line); border-radius: 14px; font-family: 'JetBrains Mono', monospace; }
+.otp-input:focus { border-color: var(--s-sun); box-shadow: 0 0 0 4px rgba(245, 158, 11, .2); outline: none; }
+.demo-note { padding: 10px 14px; border-radius: 12px; background: #fffbeb; border: 1px dashed #f59e0b; color: #92400e; font-size: .84rem; } .demo-note code { font-size: 1rem; font-weight: 800; letter-spacing: .15em; color: #78350f; background: none; }
+.otp-links { display: flex; justify-content: space-between; gap: 10px; }
+.linkbtn { background: none; border: 0; padding: 4px 0; color: var(--s-sun-dark); font-weight: 700; font-size: .85rem; cursor: pointer; } .linkbtn:hover { text-decoration: underline; } .linkbtn:disabled { color: var(--s-muted); cursor: default; text-decoration: none; }
+
+.wres { display: grid; gap: 12px; }
+.wres-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--s-line); }
+.wres-head b { display: block; font-size: 1.08rem; color: var(--s-ink); } .wres-head span { font-size: .84rem; color: var(--s-muted); }
+.wgroup { padding: 14px 16px; border-radius: 14px; border: 1px solid var(--s-line); background: #fff; display: grid; gap: 9px; }
+.wgroup.in_warranty { border-left: 4px solid #10b981; } .wgroup.expired { border-left: 4px solid #ef4444; } .wgroup.not_started { border-left: 4px solid #f59e0b; }
+.wg-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; } .wg-top b { display: block; color: var(--s-ink); font-size: .94rem; } .wg-top small { color: var(--s-muted); font-size: .8rem; }
+.wg-badge { flex: none; padding: 3px 10px; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
+.wgroup.in_warranty .wg-badge { background: #d1fae5; color: #065f46; } .wgroup.expired .wg-badge { background: #fee2e2; color: #991b1b; } .wgroup.not_started .wg-badge { background: #fef3c7; color: #92400e; }
+.wg-bar { position: relative; height: 22px; border-radius: 99px; background: #eef1f6; overflow: hidden; }
+.wg-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #34d399, #059669); border-radius: 99px; transition: width .8s cubic-bezier(.2, .8, .2, 1); }
+.wg-bar span { position: relative; z-index: 1; display: block; padding: 0 12px; line-height: 22px; font-size: .72rem; font-weight: 700; color: #064e3b; }
+.wg-serials { display: flex; flex-wrap: wrap; gap: 6px; } .wg-serials code { padding: 3px 9px; border-radius: 8px; background: #f1f4fa; font-size: .75rem; color: #334155; }
+.wgroup .linkbtn { justify-self: start; }
