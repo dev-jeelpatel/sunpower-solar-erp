@@ -27,6 +27,7 @@ export const inventoryController = {
     res.status(204).end();
   }),
   cancelPurchase: wrap(async (req, res) => res.json(await inventoryService.cancelPurchase(idOf(req), req.user.id))),
+  adjust: wrap(async (req, res) => res.json(await inventoryService.adjust(req.body, req.user.id))),
   addUnits: wrap(async (req, res) => res.status(201).json(await inventoryService.addUnits(req.body, req.user.id))),
   renameUnit: wrap(async (req, res) => res.json(await inventoryService.renameUnit(idOf(req), req.body.serial, req.user.id))),
   removeUnit: wrap(async (req, res) => res.json(await inventoryService.removeUnit(idOf(req), req.user.id))),

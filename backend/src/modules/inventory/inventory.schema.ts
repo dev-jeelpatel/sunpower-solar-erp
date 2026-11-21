@@ -13,6 +13,13 @@ export const addUnitsSchema = z.object({
 });
 export type AddUnitsInput = z.infer<typeof addUnitsSchema>;
 
+export const adjustSchema = z.object({
+  productId: id('Product'),
+  change: z.coerce.number({ invalid_type_error: 'Enter a number' }).int('Whole numbers only').refine((n) => n !== 0, 'Enter how many to add or remove').refine((n) => Math.abs(n) <= 100000, 'That is too many'),
+  reason: z.string().trim().min(3, 'Give a short reason, e.g. "Stock count correction"').max(200),
+});
+export type AdjustInput = z.infer<typeof adjustSchema>;
+
 export const renameUnitSchema = z.object({ serial });
 
 export const poSchema = z.object({

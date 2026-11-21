@@ -1,7 +1,7 @@
 import { conflict, notFound, unprocessable } from '../../lib/errors';
 import { logActivity, tx } from '../../lib/prisma';
 import { inventoryRepository as repo } from './inventory.repository';
-import type { AddUnitsInput, PoInput, ReceiveInput, SupplierInput } from './inventory.schema';
+import type { AdjustInput, AddUnitsInput, PoInput, ReceiveInput, SupplierInput } from './inventory.schema';
 
 export const inventoryService = {
   stock: repo.stock,
@@ -125,5 +125,18 @@ export const inventoryService = {
       await repo.adjust(db, u.product_id, -1, null, userId);
       await logActivity(db, 'unit', id, 'deleted', userId, { serial: u.serial_no });
       return { ok: true };
+    }),
+
+  /** Stock count correction for quantity items (cables, connectors...). Serial-numbered items change by adding or deleting serials. */
+  adjust: (d: AdjustInput, userId: number) =>
+    tx(async (db) => {
+      const p = await repo.productForUnits(db, d.productId);
+      if (!p || !p.active) throw notFound('Product');
+      if (p.tracked_serial) throw unprocessable('This product is counted by serial number. Add or delete serials instead', { productId: 'Use serial numbers' });
+      const before = await repo.onHand(db, p.id);
+      if (before + d.change < 0) throw unprocessable(`Only ${before} in stock, so you cannot remove ${-d.change}`, { change: `Only ${before} in stock` });
+      await repo.manualAdjust(db, p.id, d.change, userId);
+      await logActivity(db, 'product', p.id, 'stock_adjusted', userId, { change: d.change, reason: d.reason, before, after: before + d.change });
+      return { before, after: before + d.change };
     }),
 };

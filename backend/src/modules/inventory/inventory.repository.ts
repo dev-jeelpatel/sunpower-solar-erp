@@ -120,4 +120,8 @@ export const inventoryRepository = {
   lockUnit: (db: Db, id: number) => q1<{ id: number; product_id: number; serial_no: string; status: string }>(db, 'SELECT * FROM inventory_units WHERE id = $1 FOR UPDATE', [id]),
   renameUnit: (db: Db, id: number, serial: string) => exec(db, 'UPDATE inventory_units SET serial_no = $2 WHERE id = $1', [id, serial]),
   deleteUnit: (db: Db, id: number) => exec(db, 'DELETE FROM inventory_units WHERE id = $1', [id]),
+
+  onHand: async (db: Db, productId: number) => (await q1<{ n: number }>(db, 'SELECT COALESCE(SUM(qty),0)::int AS n FROM stock_movements WHERE product_id = $1', [productId]))?.n ?? 0,
+  manualAdjust: (db: Db, productId: number, qty: number, userId: number) =>
+    exec(db, `INSERT INTO stock_movements (product_id, qty, reason, ref_type, created_by) VALUES ($1,$2,'adjustment'::movement_reason,'manual',$3)`, [productId, qty, userId]),
 };

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
-import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, Pager, Tabs, fmtDate, label, money, useAction, useAsync, useDebounced, useForm, useToast } from '../components/ui';
+import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, Pager, Seg, Tabs, fmtDate, label, money, useAction, useAsync, useDebounced, useForm, useToast } from '../components/ui';
 import { Chips, Kpi, KpiRow, Meter, Person, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
 import { validate, required, positive, isPhone, isEmail } from '../validators';
@@ -12,9 +12,43 @@ const CAT_ICON: Record<string, IconName> = {
   earthing: 'shield', stand: 'wrench', cable: 'chart', connector: 'wrench',
 };
 
+function AdjustStock({ p, onClose, onDone }) {
+  const [mode, setMode] = useState<'add' | 'remove'>('add');
+  const [qty, setQty] = useState('');
+  const [reason, setReason] = useState('');
+  const [err, setErr] = useState<Record<string, string>>({});
+  const { run, busy, error } = useAction();
+  const n = Math.floor(Number(qty)) || 0;
+  const change = mode === 'add' ? n : -n;
+  const after = Number(p.on_hand) + change;
+  const submit = async () => {
+    const e: Record<string, string> = {};
+    if (!(n > 0)) e.qty = 'Enter how many';
+    else if (after < 0) e.qty = `Only ${p.on_hand} in stock`;
+    if (reason.trim().length < 3) e.reason = 'Give a short reason';
+    setErr(e);
+    if (Object.keys(e).length) return;
+    if (await run(() => post('/inventory/stock/adjust', { productId: p.product_id, change, reason }), 'Stock updated')) onDone();
+  };
+  return (
+    <Modal title={`Update stock: ${p.name}`} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Save stock</button></>}>
+      {error && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
+      <div className="stack">
+        <Seg value={mode} onChange={(v) => setMode(v as any)} options={[['add', 'Add stock'], ['remove', 'Remove stock']]} />
+        <Field label="Quantity" error={err.qty}><input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus /></Field>
+        <Field label="Reason" error={err.reason} hint="Saved in the history, e.g. Stock count correction, damaged, found in store"><input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+        <div className="alert" style={{ margin: 0 }}>Now <b>{p.on_hand}</b> &rarr; after this change <b>{n ? after : p.on_hand}</b></div>
+      </div>
+    </Modal>
+  );
+}
+
 function Stock() {
+  const user = useCurrentUser();
+  const wh = can(user, 'warehouse');
   const state = useAsync(() => get('/inventory/stock'));
   const [cat, setCat] = useState('');
+  const [adj, setAdj] = useState<any>(null);
   return (
     <Async state={state}>{(all: any[]) => {
       const rows = all.filter((r) => r.category !== 'service');
@@ -32,7 +66,7 @@ function Stock() {
           <Chips value={cat} onChange={setCat} options={[{ value: '', label: 'All', count: rows.length }, ...cats.map((c) => ({ value: c, label: label(c), count: rows.filter((r) => r.category === c).length }))]} />
           <Card pad={false}>
             <div className="table-wrap"><table>
-              <thead><tr><th>Product</th><th>Tracking</th><th style={{ width: 220 }}>On hand</th><th className="num">Committed</th><th className="num">Available</th><th className="num">Reorder at</th><th>Status</th></tr></thead>
+              <thead><tr><th>Product</th><th>Tracking</th><th style={{ width: 220 }}>On hand</th><th className="num">Committed</th><th className="num">Available</th><th className="num">Reorder at</th><th>Status</th>{wh && <th />}</tr></thead>
               <tbody>{shown.map((r) => {
                 const onHand = Number(r.on_hand), reorder = Number(r.reorder_level);
                 const tone = r.low ? 'rose' : onHand < reorder * 1.5 ? 'amber' : 'green';
@@ -45,11 +79,13 @@ function Stock() {
                     <td className="num"><span className={`amt ${Number(r.available) < 0 ? 'bad' : ''}`}>{r.available}</span></td>
                     <td className="num">{reorder}</td>
                     <td>{r.low ? <Tag tone="rose">Reorder now</Tag> : <Tag tone="green">In stock</Tag>}</td>
+                    {wh && <td className="right nowrap">{r.tracked_serial ? <span className="muted small">via serials</span> : <button className="btn sm secondary" onClick={() => setAdj(r)}>Update stock</button>}</td>}
                   </tr>
                 );
               })}</tbody>
             </table></div>
           </Card>
+          {adj && <AdjustStock p={adj} onClose={() => setAdj(null)} onDone={() => { setAdj(null); state.reload(); }} />}
         </div>
       );
     }}</Async>
@@ -61,7 +97,24 @@ function AddSerials({ onClose, onDone }) {
   const [productId, setProductId] = useState('');
   const [text, setText] = useState('');
   const [err, setErr] = useState('');
+  const [gen, setGen] = useState({ prefix: '', start: '1', pad: 3, count: '' });
   const { run, busy, error } = useAction();
+  // picking a product suggests the next serial after the latest one already in the system
+  const pick = async (id: string) => {
+    setProductId(id);
+    if (!id) return;
+    try {
+      const d: any = await get(`/inventory/units?productId=${id}&limit=1`);
+      const m = /^(.*?)(\d+)$/.exec(d.items[0]?.serial_no || '');
+      if (m) setGen((g) => ({ ...g, prefix: m[1], start: String(Number(m[2]) + 1), pad: m[2].length }));
+    } catch { /* suggestion only */ }
+  };
+  const fill = () => {
+    const n = Math.min(Math.floor(Number(gen.count)) || 0, 500), from = Math.floor(Number(gen.start)) || 1;
+    if (!gen.prefix.trim() || n < 1) return setErr('Enter a prefix and how many serials to generate');
+    setErr('');
+    setText(Array.from({ length: n }, (_, i) => `${gen.prefix.trim().toUpperCase()}${String(from + i).padStart(gen.pad, '0')}`).join('\n'));
+  };
   const list = [...new Set(text.split(/[\s,;]+/).map((s) => s.trim().toUpperCase()).filter(Boolean))];
   const submit = async () => {
     if (!productId) return setErr('Choose a product');
@@ -73,7 +126,16 @@ function AddSerials({ onClose, onDone }) {
     <Modal title="Add serial numbers to stock" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Add {list.length || ''} to stock</button></>}>
       {(error || err) && <div className="alert bad" style={{ marginBottom: 12 }}>{err || error}</div>}
       <div className="stack">
-        <Field label="Product"><select value={productId} onChange={(e) => setProductId(e.target.value)}><option value="">Select…</option>{(prods.data || []).filter((p) => p.tracked_serial).map((p) => <option key={p.product_id} value={p.product_id}>{p.name}</option>)}</select></Field>
+        <Field label="Product"><select value={productId} onChange={(e) => pick(e.target.value)}><option value="">Select…</option>{(prods.data || []).filter((p) => p.tracked_serial).map((p) => <option key={p.product_id} value={p.product_id}>{p.name}</option>)}</select></Field>
+        <div className="gen-box">
+          <b className="small">Generate a run of serial numbers</b>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <Field label="Prefix"><input className="mono" style={{ width: 110 }} value={gen.prefix} onChange={(e) => setGen({ ...gen, prefix: e.target.value.toUpperCase() })} placeholder="PNL-" /></Field>
+            <Field label="Start at"><input type="number" min="1" style={{ width: 90 }} value={gen.start} onChange={(e) => setGen({ ...gen, start: e.target.value })} /></Field>
+            <Field label="How many"><input type="number" min="1" max="500" style={{ width: 90 }} value={gen.count} onChange={(e) => setGen({ ...gen, count: e.target.value })} placeholder="86" /></Field>
+            <button type="button" className="btn secondary" onClick={fill}>Fill list</button>
+          </div>
+        </div>
         <Field label="Serial numbers" hint="Type or paste one per line, e.g. PNL-201"><textarea rows={6} className="mono" value={text} onChange={(e) => setText(e.target.value)} placeholder={'PNL-201\nPNL-202'} /></Field>
         <span className="small muted">{list.length} entered. Each one is also written to the stock ledger.</span>
       </div>

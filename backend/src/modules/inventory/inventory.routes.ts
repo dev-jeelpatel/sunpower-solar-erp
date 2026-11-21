@@ -3,7 +3,7 @@ import { idParam } from '../../lib/zod';
 import { authenticate, authorize } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { inventoryController as c } from './inventory.controller';
-import { addUnitsSchema, poSchema, renameUnitSchema, receiveSchema, supplierSchema } from './inventory.schema';
+import { addUnitsSchema, adjustSchema, poSchema, renameUnitSchema, receiveSchema, supplierSchema } from './inventory.schema';
 
 export const inventoryRouter = Router();
 inventoryRouter.use(authenticate);
@@ -18,6 +18,7 @@ inventoryRouter.post('/suppliers', authorize('warehouse'), validate(supplierSche
 inventoryRouter.put('/suppliers/:id', authorize('warehouse'), validate(idParam, 'params'), validate(supplierSchema), c.updateSupplier);
 inventoryRouter.delete('/suppliers/:id', authorize('warehouse'), validate(idParam, 'params'), c.removeSupplier);
 
+inventoryRouter.post('/stock/adjust', authorize('warehouse'), validate(adjustSchema), c.adjust);
 inventoryRouter.post('/units', authorize('warehouse'), validate(addUnitsSchema), c.addUnits);
 inventoryRouter.put('/units/:id', authorize('warehouse'), validate(idParam, 'params'), validate(renameUnitSchema), c.renameUnit);
 inventoryRouter.delete('/units/:id', authorize('warehouse'), validate(idParam, 'params'), c.removeUnit);

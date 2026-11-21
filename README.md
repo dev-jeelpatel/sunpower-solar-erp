@@ -225,6 +225,7 @@ Every list has the actions it needs, and each delete follows a safety rule so hi
 | Product | warehouse | never used (otherwise it is hidden, and it cannot be deleted while a package uses it) |
 | Package | admin | always (it is hidden from new quotes; old quotes keep their copy) |
 | Serial number | warehouse adds loose units, fixes typos | still in stock (stock ledger is adjusted) |
+| Quantity stock (cables, connectors...) | warehouse: Inventory → Stock levels → Update stock (add or remove, with a reason) | not applicable, the count cannot go below zero |
 | Supplier | warehouse | no purchase orders |
 | Purchase order | create, receive | cancel while still open |
 | Customer | sales, support | admin only, and only with no orders, equipment, invoices or tickets |
