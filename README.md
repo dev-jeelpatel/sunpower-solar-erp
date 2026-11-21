@@ -216,6 +216,22 @@ unique and tied to one customer.
 
 ---
 
+### Adding, editing and deleting records
+
+Every list has the actions it needs, and each delete follows a safety rule so history is never lost:
+
+| Record | Add / edit | Delete is allowed when |
+|---|---|---|
+| Product | warehouse | never used (otherwise it is hidden, and it cannot be deleted while a package uses it) |
+| Package | admin | always (it is hidden from new quotes; old quotes keep their copy) |
+| Serial number | warehouse adds loose units, fixes typos | still in stock (stock ledger is adjusted) |
+| Supplier | warehouse | no purchase orders |
+| Purchase order | create, receive | cancel while still open |
+| Customer | sales, support | admin only, and only with no orders, equipment, invoices or tickets |
+| Enquiry | sales | no quote and not won |
+| Quote | create, send | draft or declined only |
+| Staff | admin (name, role, rate, password) | disable instead of delete |
+
 ## Roles and permissions
 
 `admin` passes every role check. `director` is read-only everywhere and is the only role besides admin that opens management reports.
