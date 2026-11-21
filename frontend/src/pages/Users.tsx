@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { get, patch, post } from '../api';
-import { Async, Badge, Card, Field, Modal, PageHead, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { del, get, patch, post } from '../api';
+import { useCurrentUser } from '../auth';
+import { Async, Badge, Card, Confirm, Field, Modal, PageHead, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { Chips, Kpi, KpiRow, Person, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
 import { validate, required, minLen, personName, email, phone } from '../validators';
@@ -33,15 +34,16 @@ function NewUser({ onClose, onDone }) {
   );
 }
 
-function EditUser({ u, onClose, onDone }) {
-  const f = useForm({ name: u.name, role: u.role, hourlyRate: String(u.hourly_rate ?? 0), password: '' });
+function EditUser({ u, me, onClose, onDone }) {
+  const f = useForm({ name: u.name, email: u.email, phone: u.phone || '', role: u.role, hourlyRate: String(u.hourly_rate ?? 0), password: '' });
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const v = f.values;
-    const errs = validate(v, { name: [required('Name'), personName('Name')], password: [(x) => (x && (x.length < 8 || !/[A-Za-z]/.test(x) || !/\d/.test(x)) ? 'At least 8 characters with a letter and a number' : null)] });
+    const errs = validate(v, { name: [required('Name'), personName('Name')], email: [required('Email'), email], phone: [phone], password: [(x) => (x && (x.length < 8 || !/[A-Za-z]/.test(x) || !/\d/.test(x)) ? 'At least 8 characters with a letter and a number' : null)] });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
-    const body: any = { name: v.name, role: v.role, hourlyRate: Number(v.hourlyRate) || 0 };
+    const body: any = { name: v.name, email: v.email, role: v.role, hourlyRate: Number(v.hourlyRate) || 0 };
+    if (v.phone) body.phone = v.phone;
     if (v.password) body.password = v.password;
     if (await run(() => patch(`/users/${u.id}`, body), 'Staff member updated')) onDone();
   };
@@ -50,7 +52,9 @@ function EditUser({ u, onClose, onDone }) {
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
         <Field label="Name" error={f.errors.name}><input {...f.bind('name')} /></Field>
-        <Field label="Role"><select {...f.bind('role')}>{ROLES.map((r) => <option key={r} value={r}>{label(r)}</option>)}</select></Field>
+        <Field label="Email" error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="Phone (optional)" error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Role" error={f.errors.role} hint={u.id === me ? 'You cannot change your own role' : 'Changes what this person can see and do after their next sign-in'}><select {...f.bind('role')} disabled={u.id === me}>{ROLES.map((r) => <option key={r} value={r}>{label(r)}</option>)}</select></Field>
         {f.values.role === 'technician' && <Field label="Hourly rate (₹)"><input type="number" min="0" {...f.bind('hourlyRate')} /></Field>}
         <Field label="New password" hint="Leave blank to keep the current one" error={f.errors.password}><input type="password" autoComplete="new-password" {...f.bind('password')} /></Field>
       </div>
@@ -70,6 +74,8 @@ export default function Users() {
   const state = useAsync(() => get('/users/all'));
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [removing, setRemoving] = useState<any>(null);
+  const me = useCurrentUser();
   const [role, setRole] = useState('');
   const { run } = useAction();
   return (
@@ -95,13 +101,16 @@ export default function Users() {
                   <td><Tag tone={ROLE_TONE[u.role] || 'slate'}>{label(u.role)}</Tag><span className="sub-line">{ROLE_NOTE[u.role]}</span></td>
                   <td className="num">{u.role === 'technician' ? <span className="amt">{money(u.hourly_rate)}</span> : <span className="muted">-</span>}</td>
                   <td><Badge status={u.active ? 'ok' : 'cancelled'}>{u.active ? 'Active' : 'Disabled'}</Badge></td>
-                  <td className="right nowrap"><button className="btn sm secondary" onClick={() => setEditing(u)}>Edit</button> <button className="btn sm secondary" onClick={async () => { if (await run(() => patch(`/users/${u.id}`, { active: !u.active }), u.active ? 'User disabled' : 'User enabled')) state.reload(); }}>{u.active ? 'Disable' : 'Enable'}</button></td>
+                  <td className="right nowrap"><button className="btn sm secondary" onClick={() => setEditing(u)}>Edit</button> {u.id !== me?.id && <><button className="btn sm secondary" onClick={async () => { if (await run(() => patch(`/users/${u.id}`, { active: !u.active }), u.active ? 'User disabled' : 'User enabled')) state.reload(); }}>{u.active ? 'Disable' : 'Enable'}</button> <button className="btn sm secondary danger-text" onClick={() => setRemoving(u)}>Delete</button></>}</td>
                 </tr>))}</tbody>
             </table></div></Card>
           </div>
         );
       }}</Async>
-      {editing && <EditUser u={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); state.reload(); }} />}
+      {removing && <Confirm danger yesLabel="Delete" title="Delete this staff member?" onNo={() => setRemoving(null)}
+        onYes={async () => { const u = removing; setRemoving(null); if (await run(() => del(`/users/${u.id}`), 'Staff member deleted')) state.reload(); }}
+        message={<>“{removing.name}” will be removed. If they already appear in enquiries, jobs or payments, they cannot be deleted. Use Disable for them instead.</>} />}
+      {editing && <EditUser u={editing} me={me?.id} onClose={() => setEditing(null)} onDone={() => { setEditing(null); state.reload(); }} />}
       {adding && <NewUser onClose={() => setAdding(false)} onDone={() => { setAdding(false); state.reload(); }} />}
     </>
   );

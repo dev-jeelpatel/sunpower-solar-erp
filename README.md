@@ -231,7 +231,7 @@ Every list has the actions it needs, and each delete follows a safety rule so hi
 | Customer | sales, support | admin only, and only with no orders, equipment, invoices or tickets |
 | Enquiry | sales | no quote and not won |
 | Quote | create, send | draft or declined only |
-| Staff | admin (name, role, rate, password) | disable instead of delete |
+| Staff | admin: add, edit name, email, phone, role, hourly rate and password | only with no history (otherwise disable). You cannot delete, disable or demote yourself, and one active admin always remains |
 
 ## Roles and permissions
 

@@ -13,3 +13,4 @@ usersRouter.get('/', usersController.list);
 usersRouter.get('/all', authorize(), usersController.listAll);
 usersRouter.post('/', authorize(), validate(createUserSchema), usersController.create);
 usersRouter.patch('/:id', authorize(), validate(idParam, 'params'), validate(updateUserSchema), usersController.update);
+usersRouter.delete('/:id', authorize(), validate(idParam, 'params'), usersController.remove);

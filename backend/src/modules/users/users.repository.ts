@@ -51,4 +51,10 @@ export const usersRepository = {
       throw e;
     }
   },
+
+  findById: (id: number) => prisma.user.findUnique({ where: { id }, select: { id: true, role: true, active: true } }),
+  activeAdminsExcept: (id: number) => prisma.user.count({ where: { role: 'admin', active: true, id: { not: id } } }),
+  async remove(id: number) {
+    await prisma.user.delete({ where: { id } });
+  },
 };
