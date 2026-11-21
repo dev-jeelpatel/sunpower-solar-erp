@@ -1,3 +1,4 @@
+import { notify, notifyUsers } from '../../realtime/socket';
 import { env } from '../../config/env';
 import { notFound, unprocessable } from '../../lib/errors';
 import { logActivity, prisma, tx } from '../../lib/prisma';
@@ -45,13 +46,17 @@ export const ticketsService = {
       await logActivity(db, 'ticket', row!.id, 'created', userId, { warranty });
       return row!.id;
     });
-    return this.get(id);
+    const t: Record<string, any> = await this.get(id);
+    notify(['support'], 'ticket:new', { title: `New ticket ${t.ticket_no}: ${t.subject}`, link: `/tickets/${id}` });
+    return t;
   },
 
   async assign(id: number, assigneeId: number) {
     if (!(await repo.isAssignable(assigneeId))) throw unprocessable('Choose an active technician or support agent', { userId: 'Invalid assignee' });
     if (!(await repo.assign(id, assigneeId))) throw unprocessable('Only open tickets can be (re)assigned');
-    return this.get(id);
+    const t: Record<string, any> = await this.get(id);
+    notifyUsers([assigneeId], 'ticket:assigned', { title: `Ticket ${t.ticket_no} was assigned to you: ${t.subject}`, link: `/tickets/${id}` });
+    return t;
   },
 
   /** Add one or many lines in a single step. If any line is wrong, none are saved. */

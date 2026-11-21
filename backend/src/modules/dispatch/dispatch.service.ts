@@ -83,6 +83,9 @@ export const dispatchService = {
       await repo.setOrderStatus(db, d.order_id, 'dispatched');
       await logActivity(db, 'order', d.order_id, 'dispatched', userId, { vehicle: vehicleNo });
     });
+    const low = await q<{ name: string; on_hand: number }>(prisma, `SELECT s.name, s.on_hand FROM v_stock s JOIN order_items oi ON oi.product_id = s.product_id JOIN dispatches d ON d.order_id = oi.order_id
+                                                                      WHERE d.id = $1 AND s.on_hand <= s.reorder_level AND s.category <> 'service'`, [id]);
+    if (low.length) notify(['warehouse'], 'stock:low', { title: `Running low: ${low.slice(0, 3).map((x) => `${x.name} (${x.on_hand} left)`).join(', ')}${low.length > 3 ? ' and more' : ''}`, link: '/inventory' });
     return this.get(id);
   },
 

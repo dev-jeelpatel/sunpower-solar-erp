@@ -1,3 +1,4 @@
+import { notify } from '../../realtime/socket';
 import fs from 'node:fs';
 import path from 'node:path';
 import { env } from '../../config/env';
@@ -75,6 +76,7 @@ export const jobsService = {
       await repo.completeOrder(db, job.order_id);
       await logActivity(db, 'order', job.order_id, 'installation_signed_off', user.id, { confirmedKw: d.confirmedKw });
     });
+    notify(['sales', 'support'], 'job:completed', { title: `Installation signed off by ${d.signerName}`, link: '/jobs' });
     return { ok: true };
   },
 };

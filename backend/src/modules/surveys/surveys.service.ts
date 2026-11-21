@@ -1,3 +1,4 @@
+import { notify, notifyUsers } from '../../realtime/socket';
 import { forbidden, notFound, unprocessable } from '../../lib/errors';
 import type { AuthUser } from '../../lib/http';
 import { logActivity, tx } from '../../lib/prisma';
@@ -23,6 +24,9 @@ export const surveysService = {
       await repo.setEnquiryStatus(db, d.enquiryId, 'survey_scheduled');
       await logActivity(db, 'enquiry', d.enquiryId, 'survey_scheduled', userId, { technicianId: d.technicianId, scheduledDate: d.scheduledDate });
       return survey;
+    }).then((survey) => {
+      notifyUsers([d.technicianId], 'survey:scheduled', { title: `New site survey for you on ${d.scheduledDate}`, link: '/surveys' });
+      return survey;
     });
   },
 
@@ -35,6 +39,9 @@ export const surveysService = {
       if (s.status !== 'scheduled') throw unprocessable('This survey has already been submitted');
       const row = await repo.complete(db, id, d);
       await logActivity(db, 'enquiry', s.enquiry_id, 'survey_submitted', user.id);
+      return { row, enquiryId: s.enquiry_id as number };
+    }).then(({ row, enquiryId }) => {
+      notify(['sales'], 'survey:submitted', { title: 'A site survey was submitted and needs your review', link: `/enquiries/${enquiryId}` });
       return row;
     });
   },

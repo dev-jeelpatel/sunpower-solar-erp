@@ -2,6 +2,7 @@ import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import { env } from '../config/env';
 import type { Role } from '../lib/http';
+import { prisma, q } from '../lib/prisma';
 import { verifyToken } from '../middleware/auth';
 
 let io: Server | null = null;
@@ -29,6 +30,7 @@ export function initSocket(server: HttpServer) {
 
 export type RealtimeEvent =
   | 'enquiry:new'
+  | 'survey:scheduled'
   | 'survey:submitted'
   | 'order:confirmed'
   | 'payment:received'
@@ -37,19 +39,38 @@ export type RealtimeEvent =
   | 'job:scheduled'
   | 'job:completed'
   | 'ticket:new'
-  | 'ticket:resolved';
+  | 'ticket:assigned'
+  | 'ticket:resolved'
+  | 'stock:low';
 
 type Payload = { title: string; link?: string } & Record<string, unknown>;
 
-const send = (rooms: string[], event: RealtimeEvent, payload: Payload) => {
-  if (!io || rooms.length === 0) return; // no-op when sockets are off (CLI scripts, tests)
-  io.to(rooms).emit('notification', { event, at: new Date().toISOString(), ...payload });
+/**
+ * Save one notification per person (so each has their own history and read state),
+ * then push it to that person's browser if they are online.
+ */
+async function deliver(userIds: number[], event: RealtimeEvent, payload: Payload) {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return;
+  const rows = await q<{ id: number; user_id: number; created_at: string }>(
+    prisma,
+    `INSERT INTO notifications (user_id, event, title, link)
+     SELECT u, $2, $3, $4 FROM unnest($1::int[]) AS u RETURNING id, user_id, created_at`,
+    [ids, event, payload.title.slice(0, 300), payload.link ?? null],
+  );
+  if (!io) return; // sockets are off in CLI scripts and tests; the saved copy is still there
+  for (const r of rows) io.to(`user:${r.user_id}`).emit('notification', { id: Number(r.id), event, title: payload.title, link: payload.link ?? null, created_at: r.created_at, read_at: null });
+}
+
+const safely = (p: Promise<void>) => { p.catch((e) => console.error('notification failed:', e?.message ?? e)); };
+
+/** Tell everyone with these roles (admin and director are always included). */
+export const notify = (roles: Role[], event: RealtimeEvent, payload: Payload) => {
+  const all = [...new Set<Role>([...roles, 'admin', 'director'])];
+  safely(
+    q<{ id: number }>(prisma, 'SELECT id FROM users WHERE active AND role::text = ANY($1::text[])', [all]).then((u) => deliver(u.map((x) => x.id), event, payload)),
+  );
 };
 
-/** Push to roles (admin & director always included). */
-export const notify = (roles: Role[], event: RealtimeEvent, payload: Payload) =>
-  send([...new Set<Role>([...roles, 'admin', 'director'])].map((r) => `role:${r}`), event, payload);
-
-/** Push to specific users (e.g. the technician a job was assigned to). */
-export const notifyUsers = (userIds: number[], event: RealtimeEvent, payload: Payload) =>
-  send(userIds.map((id) => `user:${id}`), event, payload);
+/** Tell specific people, e.g. the technician a job was assigned to. */
+export const notifyUsers = (userIds: number[], event: RealtimeEvent, payload: Payload) => safely(deliver(userIds, event, payload));

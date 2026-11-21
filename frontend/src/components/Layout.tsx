@@ -1,3 +1,4 @@
+import NotificationBell from './NotificationBell';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useCurrentUser } from '../auth';
@@ -22,6 +23,7 @@ const NAV: [string, NavItem[]][] = [
   ['Operations', [
     ['/inventory', 'Inventory', 'warehouse', ['warehouse', 'director']],
     ['/dispatch', 'Dispatch', 'truck', ['warehouse', 'director']],
+    ['/schedule', 'Schedule', 'calendar', ['sales', 'support', 'technician', 'director']],
     ['/jobs', 'Installation jobs', 'wrench', ['technician', 'sales', 'director']],
   ]],
   ['After-sales', [
@@ -142,6 +144,7 @@ export default function Layout() {
           <button className="search-btn" onClick={() => setPalette(true)} aria-label="Quick search">
             <Icon n="search" /><span>Search pages…</span><kbd>Ctrl K</kbd>
           </button>
+          <NotificationBell />
           <Link to="/home" className="pill" title="Open the customer website"><Icon n="globe" />Website</Link>
           <div className="usermenu" ref={menuRef}>
             <button className="avatar-btn" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu}>

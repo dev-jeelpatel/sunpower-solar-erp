@@ -24,6 +24,8 @@ import { jobsRouter } from './modules/jobs/jobs.routes';
 import { subsidiesRouter } from './modules/subsidies/subsidies.routes';
 import { ticketsRouter } from './modules/tickets/tickets.routes';
 import { claimsRouter } from './modules/claims/claims.routes';
+import { notificationsRouter } from './modules/notifications/notifications.routes';
+import { scheduleRouter } from './modules/schedule/schedule.routes';
 import { websiteRouter } from './modules/public/public.routes';
 import { usersRouter } from './modules/users/users.routes';
 import { availabilityRouter } from './modules/availability/availability.routes';
@@ -73,6 +75,8 @@ app.use('/api/jobs', jobsRouter);
 app.use('/api/subsidies', subsidiesRouter);
 app.use('/api/tickets', ticketsRouter);
 app.use('/api/claims', claimsRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/schedule', scheduleRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -1,3 +1,4 @@
+import { notify } from '../../realtime/socket';
 import { env } from '../../config/env';
 import { notFound, unprocessable } from '../../lib/errors';
 import { logActivity, tx } from '../../lib/prisma';
@@ -44,7 +45,11 @@ export const invoicesService = {
         }
       }
       await logActivity(db, 'invoice', id, 'payment', userId, { amount: d.amount, method: d.method });
-      return { invoiceId: id, paid, balance: round2(inv.total - paid), status, orderConfirmed };
+      return { invoiceId: id, paid, balance: round2(inv.total - paid), status, orderConfirmed, orderId: inv.order_id as number | null, invoiceNo: String((inv as any).invoice_no ?? '') };
+    }).then((r) => {
+      notify(['sales'], 'payment:received', { title: `Payment of ${inr(d.amount)} received on ${r.invoiceNo}`, link: r.orderId ? `/orders/${r.orderId}` : `/invoices/${r.invoiceId}` });
+      if (r.orderConfirmed && r.orderId) notify(['warehouse'], 'dispatch:ready', { title: 'An order was confirmed: it is ready to pack and dispatch', link: '/dispatch' });
+      return r;
     });
   },
 };
