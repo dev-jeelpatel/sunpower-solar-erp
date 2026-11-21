@@ -1,38 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useCurrentUser } from '../auth';
+import { Icon, type IconName } from './icons';
 import { label } from './ui';
 
-// Minimal 24px stroke icons (Lucide-style paths), so the UI has no emoji and no icon dependency.
-const P = {
-  dash: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
-  inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
-  ruler: 'M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0zM14.5 12.5l2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2',
-  doc: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
-  box: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
-  card: 'M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM2 10h20',
-  bank: 'M3 21h18M5 21V10M9 21V10M15 21V10M19 21V10M12 3 2 9h20z',
-  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
-  warehouse: 'M22 8.35V20a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8.35a1 1 0 0 1 .55-.89l9-4.5a1 1 0 0 1 .9 0l9 4.5a1 1 0 0 1 .55.89zM6 18h12M6 14h12',
-  truck: 'M1 3h15v13H1zM16 8h4l3 3v5h-7zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
-  wrench: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z',
-  ticket: 'M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2zM13 5v2M13 17v2M13 11v2',
-  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3',
-  chart: 'M3 3v18h18M7 14l4-4 4 4 5-6',
-  sun: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42',
-  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
-  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
-  menu: 'M3 6h18M3 12h18M3 18h18',
-};
-const Icon = ({ name }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d={P[name]} />
-  </svg>
-);
-
 // [path, label, icon, roles that see it]
+type NavItem = [string, string, IconName, string[]];
 const ALL = ['admin', 'sales', 'technician', 'warehouse', 'support', 'director'];
-type NavItem = [string, string, string, string[]];
 const NAV: [string, NavItem[]][] = [
   ['Overview', [['/', 'Dashboard', 'dash', ALL]]],
   ['Sales', [
@@ -61,54 +35,129 @@ const NAV: [string, NavItem[]][] = [
 ];
 
 const initials = (name = '') => name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+const COLLAPSE_KEY = 'sunpower_sidebar_collapsed';
+
+/** Ctrl/Cmd + K: jump to any page you are allowed to see. */
+function CommandPalette({ items, onClose }: { items: { group: string; to: string; text: string; icon: IconName }[]; onClose: () => void }) {
+  const nav = useNavigate();
+  const [q, setQ] = useState('');
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return t ? items.filter((i) => i.text.toLowerCase().includes(t) || i.group.toLowerCase().includes(t)) : items;
+  }, [q, items]);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { setActive(0); }, [q]);
+
+  const go = (to: string) => { onClose(); nav(to); };
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') onClose();
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(a + 1, list.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+    else if (e.key === 'Enter' && list[active]) go(list[active].to);
+  };
+
+  return (
+    <div className="cmd-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="cmd" role="dialog" aria-modal="true" aria-label="Quick search" onKeyDown={onKey}>
+        <div className="cmd-in"><Icon n="search" /><input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Jump to a page…" aria-label="Search pages" /><kbd>Esc</kbd></div>
+        <ul className="cmd-list">
+          {list.length === 0 && <li className="cmd-empty">No pages match “{q}”</li>}
+          {list.map((i, n) => (
+            <li key={i.to}>
+              <button className={n === active ? 'on' : ''} onMouseEnter={() => setActive(n)} onClick={() => go(i.to)}>
+                <span className="cmd-ic"><Icon n={i.icon} /></span><span>{i.text}</span><small>{i.group}</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="cmd-foot"><span><kbd>↑</kbd><kbd>↓</kbd> to move</span><span><kbd>Enter</kbd> to open</span></div>
+      </div>
+    </div>
+  );
+}
 
 export default function Layout() {
   const { logout } = useAuth();
   const user = useCurrentUser();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false); // mobile drawer
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; } });
+  const [palette, setPalette] = useState(false);
+  const [menu, setMenu] = useState(false);
   const loc = useLocation();
-  useEffect(() => setOpen(false), [loc.pathname]);
-  const show = (roles) => user.role === 'admin' || roles.includes(user.role);
-  const current = NAV.flatMap(([g, items]) => items.map((i) => [g, ...i])).find(([, to]) => (to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(to as string)));
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setOpen(false); setMenu(false); }, [loc.pathname]);
+  useEffect(() => { try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* ignore */ } }, [collapsed]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette((p) => !p); } };
+    const onClick = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(false); };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('mousedown', onClick);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mousedown', onClick); };
+  }, []);
+
+  const show = (roles: string[]) => user.role === 'admin' || roles.includes(user.role);
+  const visible = useMemo(() => NAV.map(([group, items]) => [group, items.filter(([, , , roles]) => show(roles))] as [string, NavItem[]]).filter(([, items]) => items.length), [user.role]); // eslint-disable-line react-hooks/exhaustive-deps
+  const flat = useMemo(() => visible.flatMap(([group, items]) => items.map(([to, text, icon]) => ({ group, to, text, icon }))), [visible]);
+  const current = flat.find((i) => (i.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(i.to)));
 
   return (
-    <div className="app">
+    <div className={`app ${collapsed ? 'collapsed' : ''}`}>
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
-          <span className="logo"><Icon name="sun" /></span>
-          <div>SunPower<small>Solar ERP</small></div>
+          <span className="logo"><Icon n="sun" /></span>
+          <div className="brand-tx">SunPower<small>Solar ERP</small></div>
         </div>
         <nav className="nav" aria-label="Main">
-          {NAV.map(([group, items]) => {
-            const visible = items.filter(([, , , roles]) => show(roles));
-            return visible.length ? (
-              <div key={group}>
-                <div className="nav-group">{group}</div>
-                {visible.map(([to, text, ico]) => (
-                  <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => (isActive ? 'active' : '')}>
-                    <span className="ico"><Icon name={ico} /></span>{text}
-                  </NavLink>
-                ))}
-              </div>
-            ) : null;
-          })}
+          {visible.map(([group, items]) => (
+            <div key={group} className="nav-sec">
+              <div className="nav-group">{group}</div>
+              {items.map(([to, text, ico]) => (
+                <NavLink key={to} to={to} end={to === '/'} title={collapsed ? text : undefined} className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <span className="ico"><Icon n={ico} /></span><span className="nav-tx">{text}</span>
+                </NavLink>
+              ))}
+            </div>
+          ))}
         </nav>
+        <button className="collapse-btn" onClick={() => setCollapsed((c) => !c)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          <Icon n={collapsed ? 'chevR' : 'chevL'} /><span className="nav-tx">Collapse</span>
+        </button>
         <div className="userbox">
           <span className="avatar">{initials(user.name)}</span>
           <div className="who"><b>{user.name}</b><span className="role">{label(user.role)}</span></div>
-          <button className="icon-btn" onClick={logout} title="Sign out" aria-label="Sign out"><Icon name="logout" /></button>
+          <button className="icon-btn" onClick={logout} title="Sign out" aria-label="Sign out"><Icon n="logout" /></button>
         </div>
       </aside>
+
       <div className="main">
         <header className="topbar">
-          <button className="btn secondary sm menu-btn" onClick={() => setOpen((o) => !o)} aria-label="Menu"><Icon name="menu" /></button>
-          <div className="where">{current ? <><span>{current[0]} / </span>{current[2]}</> : 'SunPower ERP'}</div>
+          <button className="btn secondary sm menu-btn" onClick={() => setOpen((o) => !o)} aria-label="Menu"><Icon n="menu" /></button>
+          <div className="where">{current ? <><span>{current.group}</span><i>/</i>{current.text}</> : 'SunPower ERP'}</div>
           <div className="sp" />
-          <Link to="/home" className="pill" title="Open the customer website"><i />View website</Link>
-          <span className="avatar" title={user.name}>{initials(user.name)}</span>
+          <button className="search-btn" onClick={() => setPalette(true)} aria-label="Quick search">
+            <Icon n="search" /><span>Search pages…</span><kbd>Ctrl K</kbd>
+          </button>
+          <Link to="/home" className="pill" title="Open the customer website"><Icon n="globe" />Website</Link>
+          <div className="usermenu" ref={menuRef}>
+            <button className="avatar-btn" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu}>
+              <span className="avatar">{initials(user.name)}</span>
+            </button>
+            {menu && (
+              <div className="menu" role="menu">
+                <div className="menu-head"><span className="avatar lg">{initials(user.name)}</span><div><b>{user.name}</b><small>{user.email}</small><em>{label(user.role)}</em></div></div>
+                <Link role="menuitem" to="/home"><Icon n="globe" />View website</Link>
+                <button role="menuitem" onClick={() => { setMenu(false); setPalette(true); }}><Icon n="search" />Quick search <kbd>Ctrl K</kbd></button>
+                <button role="menuitem" className="danger" onClick={logout}><Icon n="logout" />Sign out</button>
+              </div>
+            )}
+          </div>
         </header>
         <main className="content"><Outlet /></main>
       </div>
+      {palette && <CommandPalette items={flat} onClose={() => setPalette(false)} />}
     </div>
   );
 }
