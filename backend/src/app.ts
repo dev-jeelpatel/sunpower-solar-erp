@@ -23,6 +23,7 @@ import { dispatchRouter } from './modules/dispatch/dispatch.routes';
 import { jobsRouter } from './modules/jobs/jobs.routes';
 import { subsidiesRouter } from './modules/subsidies/subsidies.routes';
 import { ticketsRouter } from './modules/tickets/tickets.routes';
+import { websiteRouter } from './modules/public/public.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
@@ -53,6 +54,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, { customSiteT
 
 app.use('/api/auth', authRouter);
 app.use('/api/public', publicRouter);
+app.use('/api/public', websiteRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/enquiries', enquiriesRouter);
 app.use('/api/catalog', catalogRouter);

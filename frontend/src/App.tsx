@@ -1,11 +1,12 @@
 import { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth';
 import Layout from './components/Layout';
 import { Loading } from './components/ui';
 
 // Route-level code splitting keeps the first load small
 const Login = lazy(() => import('./pages/Login.tsx'));
+const Home = lazy(() => import('./pages/Home.tsx'));
 const PublicEnquiry = lazy(() => import('./pages/PublicEnquiry.tsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.tsx'));
 const Enquiries = lazy(() => import('./pages/Enquiries.tsx'));
@@ -31,16 +32,19 @@ const Lookup = lazy(() => import('./pages/Lookup.tsx'));
 const Reports = lazy(() => import('./pages/Reports.tsx'));
 const Users = lazy(() => import('./pages/Users.tsx'));
 
-function Protected({ children }) {
+function Protected({ children }: { children: JSX.Element }) {
+  const { pathname } = useLocation();
   const { user, ready } = useAuth();
   if (!ready) return <Loading />;
-  return user ? children : <Navigate to="/login" replace />;
+  // Visitors who land on the root see the public website; deep links go to the staff login
+  return user ? children : <Navigate to={pathname === '/' ? '/home' : '/login'} replace />;
 }
 
 export default function App() {
   return (
     <Suspense fallback={<Loading />}>
       <Routes>
+        <Route path="/home" element={<Home />} />
         <Route path="/enquire" element={<PublicEnquiry />} />
         <Route path="/login" element={<Login />} />
         <Route element={<Protected><Layout /></Protected>}>

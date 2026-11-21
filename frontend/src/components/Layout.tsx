@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, useCurrentUser } from '../auth';
 import { label } from './ui';
 
@@ -104,7 +104,7 @@ export default function Layout() {
           <button className="btn secondary sm menu-btn" onClick={() => setOpen((o) => !o)} aria-label="Menu"><Icon name="menu" /></button>
           <div className="where">{current ? <><span>{current[0]} / </span>{current[2]}</> : 'SunPower ERP'}</div>
           <div className="sp" />
-          <span className="pill"><i />All systems live</span>
+          <Link to="/home" className="pill" title="Open the customer website"><i />View website</Link>
           <span className="avatar" title={user.name}>{initials(user.name)}</span>
         </header>
         <main className="content"><Outlet /></main>
