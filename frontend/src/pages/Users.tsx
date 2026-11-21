@@ -65,7 +65,7 @@ export default function Users() {
               <thead><tr><th>Member</th><th>Role</th><th className="num">Hourly rate</th><th>Status</th><th /></tr></thead>
               <tbody>{shown.map((u) => (
                 <tr key={u.id}>
-                  <td><Person name={u.name} sub={u.email} /></td>
+                  <td><Person name={u.name} sub={u.email} role={u.role} /></td>
                   <td><Tag tone={ROLE_TONE[u.role] || 'slate'}>{label(u.role)}</Tag><span className="sub-line">{ROLE_NOTE[u.role]}</span></td>
                   <td className="num">{u.role === 'technician' ? <span className="amt">{money(u.hourly_rate)}</span> : <span className="muted">-</span>}</td>
                   <td><Badge status={u.active ? 'ok' : 'cancelled'}>{u.active ? 'Active' : 'Disabled'}</Badge></td>

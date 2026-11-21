@@ -45,7 +45,7 @@ export default function Jobs() {
                       <div><b>{j.scheduled_date ? fmtDate(j.scheduled_date) : 'Not scheduled'}</b><span>{j.status === 'completed' ? 'Signed off' : j.scheduled_date ? d.text : 'Waiting for a date'}</span></div>
                       <Icon n="calendar" size={20} />
                     </div>
-                    <div className="crew">{crew.map((c) => <Avatar key={c} name={c} mini />)}<small>{crew.join(', ') || 'No crew assigned yet'}</small></div>
+                    <div className="crew">{crew.map((c) => <Avatar key={c} name={c} mini role="technician" />)}<small>{crew.join(', ') || 'No crew assigned yet'}</small></div>
                     {j.status !== 'completed' && (j.dispatch_status === 'delivered'
                       ? <Tag tone="green">Materials delivered</Tag>
                       : <Tag tone="amber">Materials: {j.dispatch_status ? label(j.dispatch_status) : 'not ready'}</Tag>)}

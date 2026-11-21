@@ -1,6 +1,7 @@
 // Shared building blocks for the list pages: KPI cards, people cells, filter chips, tags, meters, steppers.
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { Face, type FaceRole } from './avatars';
 import { Icon, type IconName } from './icons';
 import { fmtDate, fmtDateTime } from './ui';
 
@@ -14,21 +15,21 @@ const PALETTE: [string, string][] = [
 const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 export const initials = (name = '') => name.split(' ').map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
-export function Avatar({ name = '', size = 38, mini = false }: { name?: string; size?: number; mini?: boolean }) {
-  const [bg, ink] = PALETTE[hash(name) % PALETTE.length];
+/** Illustrated round avatar. The face is generated from the name; the outfit follows the role. */
+export function Avatar({ name = '', size = 38, mini = false, role = 'customer' }: { name?: string; size?: number; mini?: boolean; role?: FaceRole }) {
   return (
-    <span className={mini ? 'mini-av' : 'cust-av'} style={{ background: bg, color: ink, ...(mini ? {} : { width: size, height: size }) }}>
-      {initials(name)}
+    <span className={mini ? 'mini-av' : 'cust-av'} style={mini ? undefined : { width: size, height: size }} title={name || undefined}>
+      <Face seed={name || '?'} role={role} />
     </span>
   );
 }
 
 /** Avatar + name + a muted second line. */
-export function Person({ name, sub, to }: { name?: string | null; sub?: ReactNode; to?: string }) {
+export function Person({ name, sub, to, role }: { name?: string | null; sub?: ReactNode; to?: string; role?: FaceRole }) {
   const n = name || 'Unknown';
   return (
     <div className="cust">
-      <Avatar name={n} />
+      <Avatar name={n} role={role} />
       <div>{to ? <Link to={to} onClick={(e) => e.stopPropagation()}><b>{n}</b></Link> : <b>{n}</b>}{sub != null && sub !== '' && <small>{sub}</small>}</div>
     </div>
   );

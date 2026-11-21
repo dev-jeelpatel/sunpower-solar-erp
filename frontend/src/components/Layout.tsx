@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useCurrentUser } from '../auth';
+import { Face } from './avatars';
 import { Icon, type IconName } from './icons';
 import { label } from './ui';
 
@@ -126,7 +127,7 @@ export default function Layout() {
           <Icon n={collapsed ? 'chevR' : 'chevL'} /><span className="nav-tx">Collapse</span>
         </button>
         <div className="userbox">
-          <span className="avatar">{initials(user.name)}</span>
+          <span className="avatar"><Face seed={user.name} role={user.role} /></span>
           <div className="who"><b>{user.name}</b><span className="role">{label(user.role)}</span></div>
           <button className="icon-btn" onClick={logout} title="Sign out" aria-label="Sign out"><Icon n="logout" /></button>
         </div>
@@ -143,11 +144,11 @@ export default function Layout() {
           <Link to="/home" className="pill" title="Open the customer website"><Icon n="globe" />Website</Link>
           <div className="usermenu" ref={menuRef}>
             <button className="avatar-btn" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu}>
-              <span className="avatar">{initials(user.name)}</span>
+              <span className="avatar"><Face seed={user.name} role={user.role} /></span>
             </button>
             {menu && (
               <div className="menu" role="menu">
-                <div className="menu-head"><span className="avatar lg">{initials(user.name)}</span><div><b>{user.name}</b><small>{user.email}</small><em>{label(user.role)}</em></div></div>
+                <div className="menu-head"><span className="avatar lg"><Face seed={user.name} role={user.role} /></span><div><b>{user.name}</b><small>{user.email}</small><em>{label(user.role)}</em></div></div>
                 <Link role="menuitem" to="/home"><Icon n="globe" />View website</Link>
                 <button role="menuitem" onClick={() => { setMenu(false); setPalette(true); }}><Icon n="search" />Quick search <kbd>Ctrl K</kbd></button>
                 <button role="menuitem" className="danger" onClick={logout}><Icon n="logout" />Sign out</button>

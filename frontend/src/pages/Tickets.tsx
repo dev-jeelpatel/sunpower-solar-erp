@@ -90,7 +90,7 @@ export default function Tickets() {
                 <td style={{ maxWidth: 260 }}><b className="soft">{t.subject}</b>{t.serial_no && <span className="sub-line"><span className="mono">{t.serial_no}</span></span>}</td>
                 <td><Tag tone={PRIORITY_TONE[t.priority] || 'slate'}>{label(t.priority)}</Tag></td>
                 <td>{t.warranty_status === 'in_warranty' ? <Tag tone="green">In warranty · free</Tag> : t.warranty_status === 'out_of_warranty' ? <Tag tone="rose">Out of warranty · billable</Tag> : <Tag>Unknown</Tag>}</td>
-                <td>{t.assigned_name ? <span className="who"><Avatar name={t.assigned_name} mini />{t.assigned_name}</span> : <span className="muted">Unassigned</span>}</td>
+                <td>{t.assigned_name ? <span className="who"><Avatar name={t.assigned_name} mini role="staff" />{t.assigned_name}</span> : <span className="muted">Unassigned</span>}</td>
                 <td><Badge status={t.status} /></td>
                 <td className="row-go"><Icon n="arrow" /></td>
               </tr>))}</tbody>

@@ -66,7 +66,7 @@ export default function Surveys() {
                       <tr key={s.id}>
                         <td className="nowrap"><b>{fmtDate(s.scheduled_date)}</b>{s.status === 'scheduled' && <span className="sub-line" style={{ color: when.tone === 'rose' ? 'var(--bad)' : undefined }}>{when.text}</span>}</td>
                         <td><Person name={s.customer_name} sub={`${s.address}${s.city ? `, ${s.city}` : ''}`} to={`/enquiries/${s.enquiry_id}`} /></td>
-                        <td><span className="who"><Avatar name={s.technician_name} mini />{s.technician_name}</span></td>
+                        <td><span className="who"><Avatar name={s.technician_name} mini role="technician" />{s.technician_name}</span></td>
                         <td>{s.roof_direction ? (
                           <div className="tags"><Tag tone="blue">Faces {s.roof_direction}</Tag><Tag>{s.roof_tilt_deg}° tilt</Tag><Tag>{s.cable_distance_m} m cable</Tag>{s.usable_area_sqft && <Tag>{s.usable_area_sqft} sq ft</Tag>}</div>
                         ) : <span className="muted">Not measured yet</span>}</td>

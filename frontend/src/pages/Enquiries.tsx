@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Icon, type IconName } from '../components/icons';
+import { Avatar } from '../components/kit';
 import { Badge, Card, Empty, Field, Loading, Modal, PageHead, Pager, label, fmtDate, useAction, useAsync, useDebounced, useForm, useToast, Async } from '../components/ui';
 import { validate, required, minLen, email, phone, normPhone, range } from '../validators';
 
@@ -61,7 +62,7 @@ function ago(d: string) {
 function CustomerCell({ e }: { e: any }) {
   return (
     <div className="cust">
-      <span className="cust-av" style={{ background: `${STAGE_COLOR[e.status] || '#6366f1'}1f`, color: STAGE_COLOR[e.status] || '#4f46e5' }}>{initials(e.customer_name)}</span>
+      <Avatar name={e.customer_name} />
       <div><b>{e.customer_name}</b><small>{e.phone}</small></div>
     </div>
   );
@@ -92,7 +93,7 @@ function Board({ items, onOpen }: { items: any[]; onOpen: (id: number) => void }
                   <div className="bcard-top"><b>{e.customer_name}</b><span className="muted small">{ago(e.created_at)}</span></div>
                   <div className="req"><b>{e.requested_kw} kW</b><span className={`tagx ${e.system_type === 'off_grid' ? 'amber' : 'blue'}`}>{e.system_type === 'off_grid' ? 'Off-grid' : 'On-grid'}</span>{e.subsidy_required && <span className="tagx green">Subsidy</span>}</div>
                   <div className="bcard-meta"><span><Icon n="pin" />{e.city || '-'}</span><span><Icon n={SOURCE_ICON[e.source] || 'inbox'} />{SOURCE_LABEL[e.source] || label(e.source)}</span></div>
-                  {e.assigned_name && <div className="bcard-who"><span className="mini-av">{initials(e.assigned_name)}</span>{e.assigned_name}</div>}
+                  {e.assigned_name && <div className="bcard-who"><Avatar name={e.assigned_name} mini role="sales" />{e.assigned_name}</div>}
                 </button>
               ))}
             </div>
@@ -170,7 +171,7 @@ export default function Enquiries() {
                 <td><RequestCell e={e} /></td>
                 <td><span className="ico-txt"><Icon n="pin" />{e.city || '-'}</span></td>
                 <td><span className="src"><Icon n={SOURCE_ICON[e.source] || 'inbox'} />{SOURCE_LABEL[e.source] || label(e.source)}</span></td>
-                <td>{e.assigned_name ? <span className="who"><span className="mini-av">{initials(e.assigned_name)}</span>{e.assigned_name}</span> : <span className="muted">Unassigned</span>}</td>
+                <td>{e.assigned_name ? <span className="who"><Avatar name={e.assigned_name} mini role="sales" />{e.assigned_name}</span> : <span className="muted">Unassigned</span>}</td>
                 <td className="nowrap"><b className="soft">{ago(e.created_at)}</b><div className="muted small">{fmtDate(e.created_at)}</div></td>
                 <td><Badge status={e.status} /></td>
                 <td className="num"><a className="callbtn" href={`tel:${e.phone}`} onClick={(ev) => ev.stopPropagation()} title={`Call ${e.customer_name}`} aria-label={`Call ${e.customer_name}`}><Icon n="phone" /></a></td>
