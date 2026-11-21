@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { get, post } from '../api';
+import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
-import { Async, Badge, Card, Empty, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { Tracker } from '../components/kit';
-import { validate, required, positive } from '../validators';
+import { validate, required, positive, minLen, email as emailRule, phone as phoneRule } from '../validators';
 
 const FLOW = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won'];
 const FLOW_LABEL: Record<string, string> = {
@@ -119,6 +119,34 @@ function ReviewModal({ s, onClose, onDone }) {
   );
 }
 
+function EditEnquiry({ e, onClose, onDone }) {
+  const f = useForm({ name: e.customer_name, phone: e.phone, email: e.email || '', address: e.address, city: e.city || '', requestedKw: String(e.requested_kw), systemType: e.system_type, subsidyRequired: !!e.subsidy_required, message: e.message || '' });
+  const { run, busy, error } = useAction(f.setErrors);
+  const submit = async () => {
+    const v = f.values;
+    const errs = validate(v, { name: [required('Name')], phone: [required('Mobile number'), phoneRule], email: [emailRule], address: [required('Address'), minLen(8, 'Address')] });
+    f.setErrors(errs);
+    if (Object.keys(errs).length) return;
+    if (await run(() => put(`/enquiries/${e.id}`, { ...v, requestedKw: Number(v.requestedKw) }), 'Enquiry updated')) onDone();
+  };
+  return (
+    <Modal title="Edit enquiry" onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Save changes</button></>}>
+      {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
+      <div className="form-grid">
+        <Field label="Name" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Mobile number" error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Email" error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="City"><input {...f.bind('city')} /></Field>
+        <Field label="Address" className="full" error={f.errors.address}><input {...f.bind('address')} /></Field>
+        <Field label="System size (kW)"><select {...f.bind('requestedKw')}>{[1, 2, 3, 4, 5].map((k) => <option key={k} value={k}>{k} kW</option>)}</select></Field>
+        <Field label="System type"><select {...f.bind('systemType')}><option value="on_grid">On-grid</option><option value="off_grid">Off-grid</option></select></Field>
+        <Field label="Message" className="full"><input {...f.bind('message')} /></Field>
+        <label className="check full"><input type="checkbox" checked={f.values.subsidyRequired} onChange={(ev) => f.set('subsidyRequired', ev.target.checked)} /> Customer wants the government subsidy</label>
+      </div>
+    </Modal>
+  );
+}
+
 /** Time a stage was reached, taken from the activity log (oldest matching entry). */
 function stampFor(e: any, stage: string): string | null {
   const first = (test: (a: string) => boolean) => [...(e.activity || [])].reverse().find((x: any) => test(x.action))?.created_at ?? null;
@@ -139,6 +167,8 @@ export default function EnquiryDetail() {
   const state = useAsync(() => get(`/enquiries/${id}`), [id]);
   const [modal, setModal] = useState<any>(null);
   const sales = can(user, 'sales');
+  const nav = useNavigate();
+  const { run } = useAction();
   const done = () => { setModal(null); state.reload(); };
 
   return (
@@ -153,6 +183,8 @@ export default function EnquiryDetail() {
               {e.status === 'qualified' && <button className="btn" onClick={() => setModal('survey')}>Schedule survey</button>}
               {toReview && <button className="btn" onClick={() => setModal('review')}>Review survey</button>}
               {['survey_approved', 'quoted'].includes(e.status) && <button className="btn" onClick={() => setModal('quote')}>Create quote</button>}
+              {e.status !== 'won' && <button className="btn secondary" onClick={() => setModal('edit')}>Edit</button>}
+              {e.status !== 'won' && !e.customer_id && e.quotes.length === 0 && <button className="btn secondary danger-text" onClick={() => setModal('delete')}>Delete</button>}
             </>} />
           {e.status === 'lost' ? <div className="alert bad" style={{ marginBottom: 16 }}>This enquiry was closed as not suitable.</div>
             : <Tracker
@@ -186,6 +218,8 @@ export default function EnquiryDetail() {
             </div>
             <Card title="Activity"><ul className="timeline">{e.activity.map((a, i) => <li key={i}><b style={{ textTransform: 'capitalize' }}>{label(a.action.replace('call_logged:', 'call: '))}</b><div className="muted small">{a.user_name || 'Website'} · {fmtDateTime(a.created_at)}</div></li>)}</ul></Card>
           </div>
+          {modal === 'edit' && <EditEnquiry e={e} onClose={() => setModal(null)} onDone={done} />}
+          {modal === 'delete' && <Confirm danger yesLabel="Delete" title="Delete this enquiry?" onNo={() => setModal(null)} onYes={async () => { setModal(null); if (await run(() => del(`/enquiries/${e.id}`), 'Enquiry deleted')) nav('/enquiries'); }} message={<>“{e.customer_name}” and its surveys and history will be removed. Use this for spam or duplicates only.</>} />}
           {modal === 'qualify' && <QualifyModal e={e} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'survey' && <SurveyModal e={e} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'quote' && <QuoteModal e={e} onClose={() => setModal(null)} />}

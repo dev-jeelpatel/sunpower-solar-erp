@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { get, post } from '../api';
+import { del, get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, PageHead, fmtDate, money, useAction, useAsync } from '../components/ui';
 
@@ -11,6 +11,7 @@ export default function QuoteDetail() {
   const state = useAsync(() => get(`/quotes/${id}`), [id]);
   const { run, busy } = useAction();
   const [confirm, setConfirm] = useState(false);
+  const [delAsk, setDelAsk] = useState(false);
   const act = async (path, msg) => { if (await run(() => post(`/quotes/${id}/${path}`), msg)) state.reload(); };
 
   return (
@@ -22,6 +23,7 @@ export default function QuoteDetail() {
             {can(user, 'sales') && q.status === 'draft' && <button className="btn" disabled={busy} onClick={() => act('send', 'Quote marked as sent')}>Mark as sent to customer</button>}
             {can(user, 'sales') && q.status === 'sent' && <><button className="btn secondary" disabled={busy} onClick={() => act('reject', 'Quote rejected')}>Customer declined</button>
               <button className="btn ok" disabled={busy || q.expired} onClick={() => setConfirm(true)}>Customer accepted → create order</button></>}
+            {can(user, 'sales') && ['draft', 'rejected'].includes(q.status) && <button className="btn secondary danger-text" onClick={() => setDelAsk(true)}>Delete</button>}
             {q.order && <Link className="btn" to={`/orders/${q.order.id}`}>View order {q.order.order_no}</Link>}
           </div>} />
         <Card>
@@ -43,6 +45,7 @@ export default function QuoteDetail() {
         </Card>
         {confirm && <Confirm title="Create order?" yesLabel="Create order" message="This converts the quote into an order and generates the invoice. The customer then pays the advance to confirm it."
           onNo={() => setConfirm(false)} onYes={async () => { setConfirm(false); const r = await run(() => post(`/quotes/${id}/accept`), 'Order created'); if (r?.id) nav(`/orders/${r.id}`); }} />}
+        {delAsk && <Confirm danger yesLabel="Delete" title="Delete this quote?" onNo={() => setDelAsk(false)} onYes={async () => { setDelAsk(false); if (await run(() => del(`/quotes/${id}`), 'Quote deleted')) nav('/quotes'); }} message={<>{q.quote_no} for {q.customer_name} will be removed. Only drafts and declined quotes can be deleted.</>} />}
       </>
     )}</Async>
   );

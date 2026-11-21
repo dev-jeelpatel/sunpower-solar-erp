@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { get, post, put } from '../api';
+import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
-import { Async, Badge, Card, Field, Modal, PageHead, Tabs, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { Async, Badge, Card, Confirm, Field, Modal, PageHead, Tabs, label, money, useAction, useAsync, useForm, useToast } from '../components/ui';
 import { Chips, Kpi, KpiRow, Meter, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
 import { validate, required, minLen } from '../validators';
@@ -37,6 +37,47 @@ function ProductForm({ p, onClose, onDone }) {
   );
 }
 
+function PackageForm({ pkg, products, onClose, onDone }) {
+  const f = useForm({ name: pkg?.name || '', kind: pkg?.kind || 'on_grid', capacityKw: pkg?.capacity_kw ?? '', description: pkg?.description || '' });
+  const [items, setItems] = useState<any[]>(pkg?.items?.map((i) => ({ productId: String(i.productId), quantity: String(i.quantity) })) || [{ productId: '', quantity: '1' }]);
+  const { run, busy, error } = useAction(f.setErrors);
+  const v = f.values;
+  const grid = ['on_grid', 'off_grid'].includes(v.kind);
+  const set = (i, k, val) => setItems(items.map((it, j) => (j === i ? { ...it, [k]: val } : it)));
+  const submit = async () => {
+    const errs: Record<string, string> = validate(v, { name: [required('Name'), minLen(3, 'Name')] });
+    if (grid && !(Number(v.capacityKw) >= 1 && Number(v.capacityKw) <= 5)) errs.capacityKw = 'Capacity must be 1 to 5 kW';
+    if (items.some((i) => !i.productId || !(Number(i.quantity) >= 1))) errs.items = 'Choose a product and quantity for every line';
+    else if (new Set(items.map((i) => i.productId)).size !== items.length) errs.items = 'Each product can appear only once';
+    f.setErrors(errs);
+    if (Object.keys(errs).length) return;
+    const body = { name: v.name, kind: v.kind, capacityKw: grid ? Number(v.capacityKw) : undefined, description: v.description, items: items.map((i) => ({ productId: Number(i.productId), quantity: Number(i.quantity) })) };
+    if (await run(() => (pkg ? put(`/catalog/packages/${pkg.id}`, body) : post('/catalog/packages', body)), 'Package saved')) onDone();
+  };
+  return (
+    <Modal title={pkg ? 'Edit package' : 'New package'} onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save</button></>}>
+      {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
+      <div className="form-grid">
+        <Field label="Package name" className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Type"><select {...f.bind('kind')}><option value="on_grid">On-grid</option><option value="off_grid">Off-grid</option><option value="hardware">Hardware</option><option value="service">Service</option></select></Field>
+        {grid && <Field label="Capacity (kW)" error={f.errors.capacityKw}><input type="number" min="1" max="5" {...f.bind('capacityKw')} /></Field>}
+        <Field label="Description" className="full"><input {...f.bind('description')} /></Field>
+      </div>
+      <h4 style={{ margin: '16px 0 8px' }}>Parts in this package</h4>
+      <div className="stack">
+        {items.map((it, i) => (
+          <div key={i} className="row" style={{ alignItems: 'flex-end' }}>
+            <Field label={i === 0 ? 'Product' : ''} className="grow"><select value={it.productId} onChange={(e) => set(i, 'productId', e.target.value)}><option value="">Select…</option>{products.map((p) => <option key={p.product_id} value={p.product_id}>{p.name}</option>)}</select></Field>
+            <Field label={i === 0 ? 'Qty' : ''}><input type="number" min="1" style={{ width: 90 }} value={it.quantity} onChange={(e) => set(i, 'quantity', e.target.value)} /></Field>
+            {items.length > 1 && <button type="button" className="btn secondary sm" onClick={() => setItems(items.filter((_, j) => j !== i))}>✕</button>}
+          </div>))}
+        {f.errors.items && <span style={{ color: 'var(--bad)' }}>{f.errors.items}</span>}
+        <div><button type="button" className="btn secondary sm" onClick={() => setItems([...items, { productId: '', quantity: '1' }])}>+ Add part</button></div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function Catalog() {
   const user = useCurrentUser();
   const [tab, setTab] = useState('packages');
@@ -45,9 +86,20 @@ export default function Catalog() {
   const pkgs = useAsync(() => get('/catalog/packages'));
   const [edit, setEdit] = useState<any>(null);
   const [open, setOpen] = useState<any>(null);
+  const [pkgEdit, setPkgEdit] = useState<any>(null);
+  const [ask, setAsk] = useState<any>(null);
+  const { run } = useAction();
+  const toast = useToast();
+  const isAdmin = can(user);
+  const reloadAll = () => { prods.reload(); pkgs.reload(); };
+  const confirmDelete = async () => {
+    const a = ask; setAsk(null);
+    if (a.type === 'package') { if (await run(() => del(`/catalog/packages/${a.item.id}`), 'Package deleted')) reloadAll(); }
+    else { const r: any = await run(() => del(`/catalog/products/${a.item.product_id}`)); if (r) { toast(r.hidden ? 'Product hidden (it has history)' : 'Product deleted', 'ok'); reloadAll(); } }
+  };
   return (
     <>
-      <PageHead title="Products & packages" sub="Package templates define the exact parts for every quote" actions={tab === 'products' && can(user, 'warehouse') && <button className="btn" onClick={() => setEdit({})}><Icon n="plus" />New product</button>} />
+      <PageHead title="Products & packages" sub="Package templates define the exact parts for every quote" actions={tab === 'products' ? can(user, 'warehouse') && <button className="btn" onClick={() => setEdit({})}><Icon n="plus" />New product</button> : isAdmin && <button className="btn" onClick={() => setPkgEdit({})}><Icon n="plus" />New package</button>} />
       <Tabs value={tab} onChange={setTab} tabs={[['packages', 'Packages (bill of materials)'], ['products', 'Products']]} />
 
       {tab === 'packages' && <Async state={pkgs}>{(rows: any[]) => {
@@ -72,6 +124,7 @@ export default function Catalog() {
                 <div className="pcard-price">{money(p.list_price)}<span className="muted small" style={{ fontWeight: 500 }}> before GST</span></div>
                 <p>{p.description}</p>
                 <button className="btn sm secondary" onClick={() => setOpen(open === p.id ? null : p.id)}>{open === p.id ? 'Hide' : 'Show'} {p.items.length} parts</button>
+                {isAdmin && <span className="pcard-actions"><button className="btn sm secondary" onClick={() => setPkgEdit(p)}>Edit</button><button className="btn sm secondary danger-text" onClick={() => setAsk({ type: 'package', item: p })}>Delete</button></span>}
                 {open === p.id && <ul className="bom">{p.items.map((i) => <li key={i.productId}><b className="soft" style={{ fontWeight: 550 }}>{i.name}</b><span>×{i.quantity}</span></li>)}</ul>}
               </article>))}</div>
           </div>
@@ -102,7 +155,7 @@ export default function Catalog() {
                       <td className="num"><span className="amt">{money(r.sell_price)}</span></td>
                       <td><Meter value={m} max={50} tone={m < 15 ? 'amber' : 'green'} caption={`${m}%`} /></td>
                       <td>{r.tracked_serial ? <Tag tone="violet">Serial no.</Tag> : <Tag>Quantity</Tag>}</td>
-                      <td className="right">{can(user, 'warehouse') && <button className="btn sm secondary" onClick={() => setEdit(r)}>Edit</button>}</td>
+                      <td className="right nowrap">{can(user, 'warehouse') && <><button className="btn sm secondary" onClick={() => setEdit(r)}>Edit</button> <button className="btn sm secondary danger-text" onClick={() => setAsk({ type: 'product', item: r })}>Delete</button></>}</td>
                     </tr>
                   );
                 })}</tbody>
@@ -111,6 +164,9 @@ export default function Catalog() {
           </div>
         );
       }}</Async>}
+      {pkgEdit && <PackageForm pkg={pkgEdit.id ? pkgEdit : null} products={(prods.data || []).filter((p) => p.active !== false)} onClose={() => setPkgEdit(null)} onDone={() => { setPkgEdit(null); reloadAll(); }} />}
+      {ask && <Confirm danger yesLabel="Delete" title={ask.type === 'package' ? 'Delete package?' : 'Delete product?'} onNo={() => setAsk(null)} onYes={confirmDelete}
+        message={ask.type === 'package' ? <>“{ask.item.name}” will no longer be offered for new quotes. Existing quotes and orders keep their own copy.</> : <>“{ask.item.name}” will be removed. If it already appears on quotes, orders or stock, it is hidden instead so your records stay intact.</>} />}
       {edit && <ProductForm p={edit.sku ? edit : null} onClose={() => setEdit(null)} onDone={() => { setEdit(null); prods.reload(); pkgs.reload(); }} />}
     </>
   );

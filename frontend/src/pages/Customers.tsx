@@ -1,14 +1,43 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { get } from '../api';
-import { Async, Badge, Card, Empty, Modal, PageHead, fmtDate, money, useAsync, useDebounced } from '../components/ui';
+import { del, get, post, put } from '../api';
+import { useCurrentUser, can } from '../auth';
+import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, fmtDate, money, useAction, useAsync, useDebounced, useForm } from '../components/ui';
+import { validate, required, minLen, email as emailRule, phone as phoneRule } from '../validators';
 import { Kpi, KpiRow, Person, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
 
-function Detail({ id, onClose }) {
-  const state = useAsync(() => get(`/customers/${id}`), [id]);
+function CustomerForm({ c, onClose, onDone }) {
+  const f = useForm({ name: c?.name || '', phone: c?.phone || '', email: c?.email || '', address: c?.address || '', city: c?.city || '' });
+  const { run, busy, error } = useAction(f.setErrors);
+  const submit = async () => {
+    const errs = validate(f.values, { name: [required('Name'), minLen(2, 'Name')], phone: [required('Mobile number'), phoneRule], email: [emailRule], address: [required('Address'), minLen(5, 'Address')] });
+    f.setErrors(errs);
+    if (Object.keys(errs).length) return;
+    if (await run(() => (c ? put(`/customers/${c.id}`, f.values) : post('/customers', f.values)), 'Customer saved')) onDone();
+  };
   return (
-    <Modal title="Customer" onClose={onClose} wide>
+    <Modal title={c ? 'Edit customer' : 'New customer'} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Save</button></>}>
+      {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
+      <div className="form-grid">
+        <Field label="Name" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Mobile number" error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Email" error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="City"><input {...f.bind('city')} /></Field>
+        <Field label="Address" className="full" error={f.errors.address}><input {...f.bind('address')} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+function Detail({ id, onClose, onEdit, onDelete }) {
+  const state = useAsync(() => get(`/customers/${id}`), [id]);
+  const user = useCurrentUser();
+  return (
+    <Modal title="Customer" onClose={onClose} wide footer={state.data && <>
+      {can(user) && <button className="btn secondary danger-text" onClick={() => onDelete(state.data)}>Delete</button>}
+      {can(user, 'sales', 'support') && <button className="btn" onClick={() => onEdit(state.data)}>Edit details</button>}
+    </>}>
       <Async state={state}>{(c) => (
         <div className="stack">
           <div><h2>{c.name}</h2><div className="muted">{c.phone}{c.email ? ` · ${c.email}` : ''}</div><div>{c.address}{c.city ? `, ${c.city}` : ''}</div></div>
@@ -24,11 +53,15 @@ function Detail({ id, onClose }) {
 export default function Customers() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<any>(null);
+  const [form, setForm] = useState<any>(null);
+  const [ask, setAsk] = useState<any>(null);
+  const user = useCurrentUser();
+  const { run } = useAction();
   const dq = useDebounced(q);
   const state = useAsync(() => get(`/customers?limit=100&q=${encodeURIComponent(dq)}`), [dq]);
   return (
     <>
-      <PageHead title="Customers" sub="Everyone who has placed an order" />
+      <PageHead title="Customers" sub="Everyone who has placed an order" actions={can(user, 'sales', 'support') && <button className="btn" onClick={() => setForm({})}><Icon n="plus" />New customer</button>} />
       <Async state={state}>{(d: any) => {
         const items: any[] = d.items;
         const orders = items.reduce((a, c) => a + Number(c.orders || 0), 0);
@@ -62,7 +95,11 @@ export default function Customers() {
           </div>
         );
       }}</Async>
-      {open && <Detail id={open} onClose={() => setOpen(null)} />}
+      {open && <Detail id={open} onClose={() => setOpen(null)} onEdit={(c) => { setOpen(null); setForm(c); }} onDelete={(c) => { setOpen(null); setAsk(c); }} />}
+      {form && <CustomerForm c={form.id ? form : null} onClose={() => setForm(null)} onDone={() => { setForm(null); state.reload(); }} />}
+      {ask && <Confirm danger yesLabel="Delete" title="Delete customer?" onNo={() => setAsk(null)}
+        onYes={async () => { const c = ask; setAsk(null); if (await run(() => del(`/customers/${c.id}`), 'Customer deleted')) state.reload(); }}
+        message={<>“{ask.name}” will be removed. This only works for a customer with no orders, equipment or tickets.</>} />}
     </>
   );
 }

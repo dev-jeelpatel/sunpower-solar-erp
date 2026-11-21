@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { get, post } from '../api';
+import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
-import { Async, Badge, Card, Empty, Field, Modal, PageHead, Pager, Tabs, fmtDate, label, money, useAction, useAsync, useDebounced, useForm, useToast } from '../components/ui';
+import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, Pager, Tabs, fmtDate, label, money, useAction, useAsync, useDebounced, useForm, useToast } from '../components/ui';
 import { Chips, Kpi, KpiRow, Meter, Person, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
-import { validate, required, positive } from '../validators';
+import { validate, required, positive, isPhone, isEmail } from '../validators';
 
 const CAT_ICON: Record<string, IconName> = {
   panel: 'sun', inverter: 'zap', battery: 'cube', charge_controller: 'zap', wiring_box: 'box', switch: 'zap',
@@ -56,7 +56,47 @@ function Stock() {
   );
 }
 
+function AddSerials({ onClose, onDone }) {
+  const prods = useAsync(() => get('/catalog/products'));
+  const [productId, setProductId] = useState('');
+  const [text, setText] = useState('');
+  const [err, setErr] = useState('');
+  const { run, busy, error } = useAction();
+  const list = [...new Set(text.split(/[\s,;]+/).map((s) => s.trim().toUpperCase()).filter(Boolean))];
+  const submit = async () => {
+    if (!productId) return setErr('Choose a product');
+    if (!list.length) return setErr('Enter at least one serial number');
+    setErr('');
+    if (await run(() => post('/inventory/units', { productId: Number(productId), serials: list }), `${list.length} serial${list.length === 1 ? '' : 's'} added to stock`)) onDone();
+  };
+  return (
+    <Modal title="Add serial numbers to stock" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Add {list.length || ''} to stock</button></>}>
+      {(error || err) && <div className="alert bad" style={{ marginBottom: 12 }}>{err || error}</div>}
+      <div className="stack">
+        <Field label="Product"><select value={productId} onChange={(e) => setProductId(e.target.value)}><option value="">Select…</option>{(prods.data || []).filter((p) => p.tracked_serial).map((p) => <option key={p.product_id} value={p.product_id}>{p.name}</option>)}</select></Field>
+        <Field label="Serial numbers" hint="Type or paste one per line, e.g. PNL-201"><textarea rows={6} className="mono" value={text} onChange={(e) => setText(e.target.value)} placeholder={'PNL-201\nPNL-202'} /></Field>
+        <span className="small muted">{list.length} entered. Each one is also written to the stock ledger.</span>
+      </div>
+    </Modal>
+  );
+}
+
+function RenameSerial({ u, onClose, onDone }) {
+  const [s, setS] = useState(u.serial_no);
+  const { run, busy, error } = useAction();
+  return (
+    <Modal title="Correct serial number" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy || !s.trim()} onClick={async () => { if (await run(() => put(`/inventory/units/${u.id}`, { serial: s.trim().toUpperCase() }), 'Serial updated')) onDone(); }}>Save</button></>}>
+      {error && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
+      <Field label={`${u.product_name}`} hint="Only units still in stock can be renamed"><input className="mono" value={s} onChange={(e) => setS(e.target.value.toUpperCase())} /></Field>
+    </Modal>
+  );
+}
+
 function Serials() {
+  const user = useCurrentUser();
+  const wh = can(user, 'warehouse');
+  const [modal, setModal] = useState<any>(null);
+  const { run } = useAction();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
@@ -65,10 +105,10 @@ function Serials() {
   return (
     <div className="page-stack">
       <Chips value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={[{ value: '', label: 'All' }, ...['in_stock', 'dispatched', 'delivered', 'faulty'].map((s) => ({ value: s, label: label(s) }))]} />
-      <div className="toolbar" style={{ margin: 0 }}><input className="search" placeholder="Search serial number…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} /></div>
+      <div className="toolbar" style={{ margin: 0 }}><input className="search" placeholder="Search serial number…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />{wh && <button className="btn" onClick={() => setModal({ type: 'add' })}><Icon n="plus" />Add serials</button>}</div>
       <Card pad={false}><Async state={state}>{(d) => d.items.length === 0 ? <Empty>No units match.</Empty> : (
         <><div className="table-wrap"><table>
-          <thead><tr><th>Serial number</th><th>Product</th><th>Status</th><th>Customer</th><th>Warranty</th></tr></thead>
+          <thead><tr><th>Serial number</th><th>Product</th><th>Status</th><th>Customer</th><th>Warranty</th>{wh && <th />}</tr></thead>
           <tbody>{d.items.map((u) => (
             <tr key={u.id}>
               <td><Link to={`/lookup?serial=${u.serial_no}`}><Tag tone="slate"><span className="mono">{u.serial_no}</span></Tag></Link></td>
@@ -76,8 +116,14 @@ function Serials() {
               <td><Badge status={u.status} /></td>
               <td>{u.customer_name ? <Person name={u.customer_name} /> : <span className="muted">Not assigned</span>}</td>
               <td>{u.warranty_end ? <><b className="soft">{fmtDate(u.warranty_end)}</b> <Badge status={u.warranty_state} /></> : <span className="muted">Starts on delivery</span>}</td>
+              {wh && <td className="right nowrap">{u.status === 'in_stock' && <><button className="btn sm secondary" onClick={() => setModal({ type: 'rename', u })}>Edit</button> <button className="btn sm secondary danger-text" onClick={() => setModal({ type: 'delete', u })}>Delete</button></>}</td>}
             </tr>))}</tbody>
         </table></div><Pager page={d.page} limit={d.limit} total={d.total} onPage={setPage} /></>)}</Async></Card>
+      {modal?.type === 'add' && <AddSerials onClose={() => setModal(null)} onDone={() => { setModal(null); state.reload(); }} />}
+      {modal?.type === 'rename' && <RenameSerial u={modal.u} onClose={() => setModal(null)} onDone={() => { setModal(null); state.reload(); }} />}
+      {modal?.type === 'delete' && <Confirm danger yesLabel="Delete" title="Delete this unit?" onNo={() => setModal(null)}
+        onYes={async () => { const u = modal.u; setModal(null); if (await run(() => del(`/inventory/units/${u.id}`), 'Unit removed from stock')) state.reload(); }}
+        message={<><b className="mono">{modal.u.serial_no}</b> is still in stock. Deleting it removes the unit and lowers the stock count by one.</>} />}
     </div>
   );
 }
@@ -143,6 +189,7 @@ function Purchases() {
   const user = useCurrentUser();
   const state = useAsync(() => get('/inventory/purchases'));
   const [modal, setModal] = useState<any>(null);
+  const { run } = useAction();
   const open = async (id) => setModal({ type: 'receive', po: await get(`/inventory/purchases/${id}`) });
   return (
     <>
@@ -151,10 +198,62 @@ function Purchases() {
         <div className="table-wrap"><table>
           <thead><tr><th>PO</th><th>Supplier</th><th>Ordered</th><th className="num">Units</th><th className="num">Value</th><th>Status</th><th /></tr></thead>
           <tbody>{rows.map((p) => <tr key={p.id}><td><b>{p.po_no}</b></td><td>{p.supplier_name}</td><td>{fmtDate(p.ordered_at)}</td><td className="num">{p.units}</td><td className="num">{money(p.total)}</td><td><Badge status={p.status} /></td>
-            <td className="right">{p.status === 'ordered' && can(user, 'warehouse') && <button className="btn sm" onClick={() => open(p.id)}>Receive goods</button>}</td></tr>)}</tbody>
+            <td className="right">{p.status === 'ordered' && can(user, 'warehouse') && <><button className="btn sm" onClick={() => open(p.id)}>Receive goods</button> <button className="btn sm secondary danger-text" onClick={() => setModal({ type: 'cancel', po: p })}>Cancel</button></>}</td></tr>)}</tbody>
         </table></div>)}</Async></Card>
+      {modal?.type === 'cancel' && <Confirm danger yesLabel="Cancel PO" title="Cancel purchase order?" onNo={() => setModal(null)}
+        onYes={async () => { const p = modal.po; setModal(null); if (await run(() => post(`/inventory/purchases/${p.id}/cancel`), 'Purchase order cancelled')) state.reload(); }}
+        message={<>{modal.po.po_no} to {modal.po.supplier_name} will be marked cancelled. Nothing has been received, so stock is not affected.</>} />}
       {modal?.type === 'new' && <NewPO onClose={() => setModal(null)} onDone={() => { setModal(null); state.reload(); }} />}
       {modal?.type === 'receive' && <Receive po={modal.po} onClose={() => setModal(null)} onDone={() => { setModal(null); state.reload(); }} />}
+    </>
+  );
+}
+
+function SupplierForm({ s, onClose, onDone }) {
+  const f = useForm({ name: s?.name || '', phone: s?.phone || '', email: s?.email || '' });
+  const { run, busy, error } = useAction(f.setErrors);
+  const submit = async () => {
+    const v = f.values;
+    const errs: Record<string, string> = {};
+    if (v.name.trim().length < 2) errs.name = 'Enter the supplier name';
+    if (v.phone && !isPhone(v.phone)) errs.phone = 'Enter a valid 10-digit mobile number';
+    if (v.email && !isEmail(v.email)) errs.email = 'Enter a valid email address';
+    f.setErrors(errs);
+    if (Object.keys(errs).length) return;
+    if (await run(() => (s ? put(`/inventory/suppliers/${s.id}`, v) : post('/inventory/suppliers', v)), 'Supplier saved')) onDone();
+  };
+  return (
+    <Modal title={s ? 'Edit supplier' : 'New supplier'} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Save</button></>}>
+      {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
+      <div className="form-grid">
+        <Field label="Supplier name" className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Phone" error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Email" error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+function Suppliers() {
+  const user = useCurrentUser();
+  const wh = can(user, 'warehouse');
+  const state = useAsync(() => get('/inventory/suppliers'));
+  const [modal, setModal] = useState<any>(null);
+  const { run } = useAction();
+  return (
+    <>
+      <div className="toolbar">{wh && <button className="btn" onClick={() => setModal({ type: 'form' })}><Icon n="plus" />New supplier</button>}</div>
+      <Card pad={false}><Async state={state}>{(rows: any[]) => rows.length === 0 ? <Empty>No suppliers yet.</Empty> : (
+        <div className="table-wrap"><table>
+          <thead><tr><th>Supplier</th><th>Phone</th><th>Email</th>{wh && <th />}</tr></thead>
+          <tbody>{rows.map((s) => (
+            <tr key={s.id}><td><b>{s.name}</b></td><td>{s.phone || <span className="muted">-</span>}</td><td>{s.email || <span className="muted">-</span>}</td>
+              {wh && <td className="right nowrap"><button className="btn sm secondary" onClick={() => setModal({ type: 'form', s })}>Edit</button> <button className="btn sm secondary danger-text" onClick={() => setModal({ type: 'delete', s })}>Delete</button></td>}</tr>))}</tbody>
+        </table></div>)}</Async></Card>
+      {modal?.type === 'form' && <SupplierForm s={modal.s} onClose={() => setModal(null)} onDone={() => { setModal(null); state.reload(); }} />}
+      {modal?.type === 'delete' && <Confirm danger yesLabel="Delete" title="Delete supplier?" onNo={() => setModal(null)}
+        onYes={async () => { const s = modal.s; setModal(null); if (await run(() => del(`/inventory/suppliers/${s.id}`), 'Supplier deleted')) state.reload(); }}
+        message={<>“{modal.s.name}” will be removed. A supplier that already has purchase orders cannot be deleted.</>} />}
     </>
   );
 }
@@ -164,8 +263,8 @@ export default function Inventory() {
   return (
     <>
       <PageHead title="Inventory" sub="Stock levels, serial numbers and goods receipts" />
-      <Tabs value={tab} onChange={setTab} tabs={[['stock', 'Stock levels'], ['serials', 'Serial numbers'], ['purchases', 'Purchases']]} />
-      {tab === 'stock' && <Stock />}{tab === 'serials' && <Serials />}{tab === 'purchases' && <Purchases />}
+      <Tabs value={tab} onChange={setTab} tabs={[['stock', 'Stock levels'], ['serials', 'Serial numbers'], ['purchases', 'Purchases'], ['suppliers', 'Suppliers']]} />
+      {tab === 'stock' && <Stock />}{tab === 'serials' && <Serials />}{tab === 'purchases' && <Purchases />}{tab === 'suppliers' && <Suppliers />}
     </>
   );
 }

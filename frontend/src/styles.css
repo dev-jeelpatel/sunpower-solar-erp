@@ -920,3 +920,8 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .sugg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
 .chip-serial { border: 1px dashed var(--primary); background: var(--primary-soft); color: var(--primary-dark); border-radius: 8px; padding: 2px 9px; font-size: .78rem; font-weight: 700; cursor: pointer; }
 .chip-serial:hover { background: var(--primary); color: #fff; }
+
+/* edit / delete actions */
+.danger-text { color: var(--bad); border-color: #fecaca; }
+.danger-text:hover { background: #fef2f2; color: #b91c1c; }
+.pcard-actions { display: inline-flex; gap: 6px; margin-left: 8px; }
