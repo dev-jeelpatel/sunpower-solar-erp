@@ -1,0 +1,48 @@
+import fs from 'node:fs';
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import swaggerUi from 'swagger-ui-express';
+import { env } from './config/env';
+import { openApiSpec } from './docs/openapi';
+import { prisma } from './lib/prisma';
+import { authenticate } from './middleware/auth';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { authRouter } from './modules/auth/auth.routes';
+import { enquiriesRouter, publicRouter } from './modules/enquiries/enquiries.routes';
+import { usersRouter } from './modules/users/users.routes';
+
+fs.mkdirSync(env.uploadDir, { recursive: true });
+
+export const app = express();
+app.disable('x-powered-by');
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(cors({ origin: env.corsOrigin }));
+app.use(express.json({ limit: '1mb' }));
+if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
+
+// Job photos are served only to signed-in users (token via Authorization header or ?token for <img>)
+app.use(
+  '/uploads',
+  (req, _res, next) => {
+    if (req.query.token && !req.headers.authorization) req.headers.authorization = `Bearer ${String(req.query.token)}`;
+    next();
+  },
+  authenticate,
+  express.static(env.uploadDir, { index: false, dotfiles: 'deny' }),
+);
+
+app.get('/api/health', async (_req, res) => {
+  await prisma.$queryRaw`SELECT 1`;
+  res.json({ status: 'ok' });
+});
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, { customSiteTitle: 'SunPower API docs' }));
+
+app.use('/api/auth', authRouter);
+app.use('/api/public', publicRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/enquiries', enquiriesRouter);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
