@@ -16,6 +16,9 @@ import { enquiriesRouter, publicRouter } from './modules/enquiries/enquiries.rou
 import { inventoryRouter } from './modules/inventory/inventory.routes';
 import { ordersRouter } from './modules/orders/orders.routes';
 import { quotesRouter } from './modules/quotes/quotes.routes';
+import { invoicesRouter } from './modules/invoices/invoices.routes';
+import { reportsRouter } from './modules/reports/reports.routes';
+import { surveysRouter } from './modules/surveys/surveys.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
@@ -53,6 +56,9 @@ app.use('/api', customersRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/quotes', quotesRouter);
 app.use('/api/orders', ordersRouter);
+app.use('/api/invoices', invoicesRouter);
+app.use('/api/surveys', surveysRouter);
+app.use('/api/reports', reportsRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
