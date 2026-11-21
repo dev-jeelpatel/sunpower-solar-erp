@@ -26,6 +26,11 @@ export const quotesService = {
       if (!enq) throw notFound('Enquiry');
       if (!['survey_approved', 'quoted'].includes(enq.status))
         throw unprocessable('A quote can only be created after the site survey is approved');
+      if (d.systemType && d.systemType !== enq.system_type) {
+        await repo.setSystemType(db, d.enquiryId, d.systemType); // the customer changed their mind
+        await logActivity(db, 'enquiry', d.enquiryId, 'system_type_changed', userId, { from: enq.system_type, to: d.systemType });
+        enq.system_type = d.systemType;
+      }
       const pkg = await repo.activePackage(db, d.packageId);
       if (!pkg) throw notFound('Package');
       if ((pkg.kind === 'on_grid' || pkg.kind === 'off_grid') && pkg.kind !== enq.system_type)
@@ -35,6 +40,16 @@ export const quotesService = {
         );
       const bom = await repo.bomOf(db, d.packageId);
       if (!bom.length) throw unprocessable('This package has no items');
+      if (d.extras.length) {
+        const found = await repo.productsByIds(db, d.extras.map((x) => x.productId));
+        if (found.length !== d.extras.length) throw unprocessable('One of the extra products is not available', { extras: 'Choose products from the list' });
+        for (const x of d.extras) {
+          const p = found.find((f) => f.id === x.productId)!;
+          const same = bom.find((b) => b.id === p.id);
+          if (same) same.quantity += x.quantity; // already in the package: just more of it
+          else bom.push({ id: p.id, name: p.name, sell_price: p.sell_price, cost_price: p.cost_price, quantity: x.quantity });
+        }
+      }
 
       const subtotal = round2(bom.reduce((s, i) => s + i.sell_price * i.quantity, 0));
       if (d.discount > subtotal) throw unprocessable('Discount cannot exceed the subtotal', { discount: 'Discount is larger than the subtotal' });

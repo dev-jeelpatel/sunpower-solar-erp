@@ -71,4 +71,8 @@ export const quotesRepository = {
 
   find: (id: number) => q1<{ status: string; enquiry_id: number; quote_no: string }>(prisma, 'SELECT status, enquiry_id, quote_no FROM quotes WHERE id = $1', [id]),
   remove: (id: number) => exec(prisma, 'DELETE FROM quotes WHERE id = $1', [id]),
+
+  productsByIds: (db: Db, ids: number[]) =>
+    q<{ id: number; name: string; sell_price: number; cost_price: number }>(db, 'SELECT id, name, sell_price, cost_price FROM products WHERE active AND id = ANY($1::int[])', [ids]),
+  setSystemType: (db: Db, enquiryId: number, type: string) => exec(db, 'UPDATE enquiries SET system_type = $2::system_type WHERE id = $1', [enquiryId, type]),
 };

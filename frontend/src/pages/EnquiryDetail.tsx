@@ -1,8 +1,9 @@
+import TechPicker from '../components/TechPicker';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
-import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, Seg, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { Tracker } from '../components/kit';
 import { Icon } from '../components/icons';
 import { validate, required, positive, personName, addressText, cityName, safeText, email as emailRule, phone as phoneRule } from '../validators';
@@ -54,22 +55,25 @@ function QualifyModal({ e, onClose, onDone }) {
 }
 
 function SurveyModal({ e, onClose, onDone }) {
-  const techs = useAsync(() => get('/users?role=technician'));
   const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
   const f = useForm({ technicianId: '', scheduledDate: tomorrow });
-  const { run, busy } = useAction(f.setErrors);
+  const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const errs = validate(f.values, { technicianId: [required('Technician')], scheduledDate: [required('Date')] });
+    if (errs.technicianId) errs.technicianId = 'Choose an available technician';
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
     const ok = await run(() => post('/surveys', { enquiryId: e.id, technicianId: Number(f.values.technicianId), scheduledDate: f.values.scheduledDate }), 'Survey scheduled');
     if (ok) onDone();
   };
   return (
-    <Modal title="Schedule site survey" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Schedule</button></>}>
-      <div className="form-grid">
-        <Field label="Technician" error={f.errors.technicianId}><select {...f.bind('technicianId')}><option value="">Select…</option>{(techs.data || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></Field>
+    <Modal title="Schedule site survey" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy || !f.values.technicianId}>Schedule</button></>}>
+      <div className="stack">
+        {error && !Object.keys(f.errors).length && <div className="alert bad">{error}</div>}
         <Field label="Visit date" error={f.errors.scheduledDate}><input type="date" min={new Date().toISOString().slice(0, 10)} {...f.bind('scheduledDate')} /></Field>
+        <Field label="Technician (only free ones can be chosen)" error={f.errors.technicianId}>
+          <TechPicker date={f.values.scheduledDate} value={f.values.technicianId} onChange={(id) => f.set('technicianId', id)} onPickDate={(d) => f.set('scheduledDate', d)} />
+        </Field>
       </div>
     </Modal>
   );
@@ -78,32 +82,93 @@ function SurveyModal({ e, onClose, onDone }) {
 function QuoteModal({ e, onClose }) {
   const nav = useNavigate();
   const pk = useAsync(() => get('/catalog/packages'));
-  const f = useForm({ packageId: '', discount: '0' });
-  const { run, busy } = useAction(f.setErrors);
-  const options = (pk.data || []).filter((p) => p.kind === e.system_type);
-  const sel = options.find((p) => String(p.id) === String(f.values.packageId));
+  const prods = useAsync(() => get('/catalog/products'));
+  const [type, setType] = useState<string>(e.system_type);
+  const [packageId, setPackageId] = useState('');
+  const [discount, setDiscount] = useState('0');
+  const [extras, setExtras] = useState<{ productId: string; quantity: string }[]>([]);
+  const [err, setErr] = useState<Record<string, string>>({});
+  const { run, busy, error } = useAction();
+
+  // step 1 decides which packages are shown, step 2 picks one (the size the customer asked for is suggested)
+  const options = (pk.data || []).filter((p) => p.kind === type);
   const suggested = options.find((p) => Number(p.capacity_kw) === Number(e.requested_kw));
-  const pid = f.values.packageId || suggested?.id || '';
-  const pkg = options.find((p) => String(p.id) === String(pid)) || sel;
+  const pid = options.some((p) => String(p.id) === packageId) ? packageId : String(suggested?.id || '');
+  const pkg = options.find((p) => String(p.id) === pid);
+  const allProducts: any[] = prods.data || [];
+  const priceOf = (id: string) => Number(allProducts.find((p) => String(p.product_id) === id)?.sell_price || 0);
+
+  const extraTotal = extras.reduce((s, x) => s + priceOf(x.productId) * (Number(x.quantity) || 0), 0);
+  const subtotal = Number(pkg?.list_price || 0) + extraTotal;
+  const disc = Math.max(Number(discount) || 0, 0);
+  const gst = Math.round((subtotal - disc) * 0.05 * 100) / 100;
+  const total = subtotal - disc + gst;
+  const setX = (i: number, k: string, v: string) => setExtras(extras.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+
   const submit = async () => {
-    if (!pid) return f.setErrors({ packageId: 'Choose a package' });
-    const r = await run(() => post('/quotes', { enquiryId: e.id, packageId: Number(pid), discount: Number(f.values.discount) || 0 }), 'Quote created');
+    const errs: Record<string, string> = {};
+    if (!pid) errs.packageId = 'Choose a package';
+    if (disc > subtotal) errs.discount = 'Discount is larger than the total';
+    if (extras.some((x) => !x.productId || !(Number(x.quantity) >= 1))) errs.extras = 'Choose a product and a quantity for every extra item';
+    else if (new Set(extras.map((x) => x.productId)).size !== extras.length) errs.extras = 'Each extra product can be added only once';
+    setErr(errs);
+    if (Object.keys(errs).length) return;
+    const r = await run(() => post('/quotes', {
+      enquiryId: e.id, packageId: Number(pid), discount: disc, systemType: type,
+      extras: extras.map((x) => ({ productId: Number(x.productId), quantity: Number(x.quantity) })),
+    }), 'Quote created');
     if (r?.id) nav(`/quotes/${r.id}`);
   };
+
   return (
     <Modal title="Create quote from template" onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy || !pkg}>Create quote</button></>}>
-      <div className="form-grid">
-        <Field label="Package" error={f.errors.packageId}><select value={pid} onChange={(ev) => f.set('packageId', ev.target.value)}>{options.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
-        <Field label="Discount (₹)" error={f.errors.discount}><input type="number" min="0" {...f.bind('discount')} /></Field>
-      </div>
-      {pkg && (
-        <div style={{ marginTop: 16 }}>
-          <h3>Parts that will be included automatically</h3>
-          <div className="table-wrap"><table><thead><tr><th>Part</th><th className="num">Qty</th><th className="num">Unit price</th></tr></thead>
-            <tbody>{pkg.items.map((i) => <tr key={i.productId}><td>{i.name}</td><td className="num">{i.quantity}</td><td className="num">{money(i.unitPrice)}</td></tr>)}</tbody></table></div>
-          <p className="muted small">List price before GST: <b>{money(pkg.list_price)}</b></p>
+      {error && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
+      <div className="stack">
+        <div className="qm-step"><b><i>1</i>System type</b>
+          <Seg value={type} onChange={(v) => { setType(v); setPackageId(''); }} options={[['on_grid', 'On-grid (with the grid)'], ['off_grid', 'Off-grid (with batteries)']]} />
+          {type !== e.system_type && <span className="muted small">The customer asked for {label(e.system_type)}. Creating this quote will update the enquiry to {label(type)}.</span>}
         </div>
-      )}
+
+        <div className="qm-step"><b><i>2</i>Package</b>
+          {!pk.loading && options.length === 0 ? (
+            <div className="alert bad">There is no {label(type)} package. Create one in <Link to="/catalog" onClick={onClose}>Products &amp; packages</Link> first.</div>
+          ) : (
+            <Field label="" error={err.packageId}>
+              <select value={pid} onChange={(ev) => setPackageId(ev.target.value)}>{options.map((p) => <option key={p.id} value={p.id}>{p.name}{Number(p.capacity_kw) === Number(e.requested_kw) ? ' (size the customer asked for)' : ''}</option>)}</select>
+            </Field>
+          )}
+          {pkg && (
+            <div className="table-wrap"><table><thead><tr><th>Included in the package</th><th className="num">Qty</th><th className="num">Unit price</th></tr></thead>
+              <tbody>{pkg.items.map((i) => <tr key={i.productId}><td>{i.name}</td><td className="num">{i.quantity}</td><td className="num">{money(i.unitPrice)}</td></tr>)}</tbody></table></div>
+          )}
+        </div>
+
+        <div className="qm-step"><b><i>3</i>Extra items <span className="muted small">(optional: add any other product the customer wants)</span></b>
+          {extras.map((x, i) => (
+            <div key={i} className="row" style={{ alignItems: 'flex-end' }}>
+              <Field label={i === 0 ? 'Product' : ''} className="grow"><select value={x.productId} onChange={(ev) => setX(i, 'productId', ev.target.value)}><option value="">Select…</option>{allProducts.map((p) => <option key={p.product_id} value={p.product_id}>{p.name} · {money(p.sell_price)}</option>)}</select></Field>
+              <Field label={i === 0 ? 'Qty' : ''}><input type="number" min="1" style={{ width: 90 }} value={x.quantity} onChange={(ev) => setX(i, 'quantity', ev.target.value)} /></Field>
+              <div className="qm-line">{money(priceOf(x.productId) * (Number(x.quantity) || 0))}</div>
+              <button type="button" className="btn secondary sm" onClick={() => setExtras(extras.filter((_, j) => j !== i))} aria-label="Remove item">✕</button>
+            </div>
+          ))}
+          {err.extras && <span style={{ color: 'var(--bad)' }}>{err.extras}</span>}
+          <div><button type="button" className="btn secondary sm" onClick={() => setExtras([...extras, { productId: '', quantity: '1' }])}>+ Add an extra product</button></div>
+        </div>
+
+        <div className="qm-step"><b><i>4</i>Discount and total</b>
+          <div className="form-grid">
+            <Field label="Discount (₹)" error={err.discount}><input type="number" min="0" value={discount} onChange={(ev) => setDiscount(ev.target.value)} /></Field>
+            <dl className="qm-total">
+              <dt>Package</dt><dd>{money(pkg?.list_price || 0)}</dd>
+              {extraTotal > 0 && <><dt>Extra items</dt><dd>{money(extraTotal)}</dd></>}
+              {disc > 0 && <><dt>Discount</dt><dd>- {money(disc)}</dd></>}
+              <dt>GST (5%)</dt><dd>{money(gst, true)}</dd>
+              <dt><b>Total</b></dt><dd><b>{money(total, true)}</b></dd>
+            </dl>
+          </div>
+        </div>
+      </div>
     </Modal>
   );
 }
