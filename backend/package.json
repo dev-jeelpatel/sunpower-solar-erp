@@ -16,7 +16,7 @@
     "db:seed": "tsx prisma/seed/seed.ts",
     "db:setup": "prisma migrate deploy && tsx prisma/seed/seed.ts",
     "db:embedded": "tsx scripts/dev-db.ts",
-    "e2e": "tsx scripts/e2e.ts"
+    "e2e": "node scripts/e2e.cjs"
   },
   "engines": {
     "node": ">=18"
