@@ -22,9 +22,9 @@ export default function DispatchDetail() {
   useEffect(() => { load(); }, [id]); // eslint-disable-line
 
   // Barcode scanners type the serial then press Enter, so submit on Enter
-  const scan = async (e) => {
-    e.preventDefault();
-    const s = serial.trim().toUpperCase();
+  const scan = async (e, pick?: string) => {
+    e?.preventDefault();
+    const s = (pick || serial).trim().toUpperCase();
     if (!s) return;
     setScanMsg(null);
     try {
@@ -34,6 +34,7 @@ export default function DispatchDetail() {
     } catch (err) { setScanMsg({ ok: false, text: err.fields?.serial || err.message }); }
     inputRef.current?.focus();
   };
+  const autofill = async () => { if (await run(() => post(`/dispatches/${id}/autofill`), 'Added the oldest in-stock serials')) load(); };
   const unscan = async (s) => { if (await run(() => del(`/dispatches/${id}/scan/${s}`))) load(); };
   const send = async () => {
     if (!vehicle.trim()) return setVErr('Enter the vehicle number');
@@ -63,7 +64,10 @@ export default function DispatchDetail() {
             <input ref={inputRef} className="scan-input mono" autoFocus placeholder="Scan or type serial number, then press Enter" value={serial} onChange={(e) => setSerial(e.target.value)} />
             {scanMsg && <div className={`alert ${scanMsg.ok ? 'ok' : 'bad'}`} role="alert">{scanMsg.text}</div>}
             <div className="progress"><i style={{ width: `${requiredTotal ? (scannedTotal / requiredTotal) * 100 : 0}%` }} /></div>
-            <span className="muted small">{scannedTotal} of {requiredTotal} serial-numbered units scanned</span>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="muted small">{scannedTotal} of {requiredTotal} serial-numbered units scanned. No scanner? Tap a suggested serial in the pick list, or</span>
+              <button type="button" className="btn secondary sm" disabled={busy || scannedTotal >= requiredTotal} onClick={autofill}>Auto-fill from stock</button>
+            </div>
           </form>
         </Card>
       )}
@@ -74,9 +78,11 @@ export default function DispatchDetail() {
           <tbody>{d.items.map((l) => (
             <tr key={l.product_id} className={l.complete ? 'line-done' : ''}>
               <td><b>{l.name}</b><div className="mono muted small">{l.sku}</div></td><td className="num">{l.required}</td>
-              <td>{l.tracked_serial ? (l.scanned.length ? l.scanned.map((s) => (
-                <div key={s} className="mono small">{s} {open && wh && <button className="btn sm secondary" style={{ padding: '0 6px', minHeight: 22 }} onClick={() => unscan(s)} aria-label={`Remove ${s}`}>✕</button>}</div>)) : <span className="muted">none scanned</span>)
-                : <span className="muted">{l.on_hand} in stock (bulk item, no scan)</span>}</td>
+              <td>{l.tracked_serial ? (<>
+                {l.scanned.length ? l.scanned.map((s) => (
+                  <div key={s} className="mono small">{s} {open && wh && <button className="btn sm secondary" style={{ padding: '0 6px', minHeight: 22 }} onClick={() => unscan(s)} aria-label={`Remove ${s}`}>✕</button>}</div>)) : <span className="muted">none scanned</span>}
+                {open && wh && l.suggested?.length > 0 && <div className="sugg"><span className="muted small">In stock, tap to add:</span>{l.suggested.map((s) => <button key={s} type="button" className="chip-serial mono" onClick={() => scan(null, s)}>{s}</button>)}</div>}
+              </>) : <span className="muted">{l.on_hand} in stock (bulk item, no scan)</span>}</td>
               <td>{l.complete ? <Badge status="ok">{open ? 'Ready' : 'Done'}</Badge> : <Badge status="pending">{l.tracked_serial ? `${l.scannedCount}/${l.required}` : 'Short on stock'}</Badge>}</td></tr>))}</tbody>
         </table></div></Card></div>
 
