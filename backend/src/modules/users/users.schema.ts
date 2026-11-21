@@ -1,9 +1,9 @@
-import { email, optionalPhone, password, text, z } from '../../lib/zod';
+import { email, optionalPhone, password, personName, z } from '../../lib/zod';
 
 export const ROLES = ['admin', 'sales', 'technician', 'warehouse', 'support', 'director'] as const;
 
 export const createUserSchema = z.object({
-  name: text('Name', { max: 100 }),
+  name: personName('Name'),
   email,
   password,
   role: z.enum(ROLES, { errorMap: () => ({ message: 'Choose a valid role' }) }),
@@ -13,7 +13,7 @@ export const createUserSchema = z.object({
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 
 export const updateUserSchema = z.object({
-  name: text('Name', { max: 100 }).optional(),
+  name: personName('Name').optional(),
   role: z.enum(ROLES).optional(),
   active: z.boolean().optional(),
   hourlyRate: z.coerce.number().min(0).max(10000).optional(),

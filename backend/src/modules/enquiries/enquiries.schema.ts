@@ -1,14 +1,15 @@
-import { id, money, optionalEmail, optionalText, phone, text, z } from '../../lib/zod';
+import { addressText, id, money, optionalCity, optionalEmail, optionalText, personName, phone, z } from '../../lib/zod';
 
 export const enquirySchema = z.object({
-  name: text('Name', { min: 2, max: 120 }),
+  name: personName('Name'),
   phone,
   email: optionalEmail,
-  address: text('Address', { min: 8, max: 300 }),
-  city: optionalText('City', 80),
+  address: addressText('Address'),
+  city: optionalCity,
   requestedKw: z.coerce
     .number({ invalid_type_error: 'Choose the system size' })
     .min(1, 'Minimum system size is 1 kW')
+    .int('System size must be a whole number of kW')
     .max(5, 'Maximum system size is 5 kW'),
   systemType: z.enum(['on_grid', 'off_grid'], { errorMap: () => ({ message: 'Choose On-Grid or Off-Grid' }) }),
   subsidyRequired: z.boolean().optional(),

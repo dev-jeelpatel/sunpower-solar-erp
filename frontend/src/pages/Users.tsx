@@ -3,7 +3,7 @@ import { get, patch, post } from '../api';
 import { Async, Badge, Card, Field, Modal, PageHead, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { Chips, Kpi, KpiRow, Person, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
-import { validate, required, minLen, email, phone } from '../validators';
+import { validate, required, minLen, personName, email, phone } from '../validators';
 
 const ROLES = ['admin', 'sales', 'technician', 'warehouse', 'support', 'director'];
 
@@ -12,7 +12,7 @@ function NewUser({ onClose, onDone }) {
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const v = f.values;
-    const errs = validate(v, { name: [required('Name')], email: [required('Email'), email], phone: [phone],
+    const errs = validate(v, { name: [required('Name'), personName('Name')], email: [required('Email'), email], phone: [phone],
       password: [required('Password'), minLen(8, 'Password'), (x) => (!/[A-Za-z]/.test(x) || !/\d/.test(x) ? 'Password needs a letter and a number' : null)] });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -38,7 +38,7 @@ function EditUser({ u, onClose, onDone }) {
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const v = f.values;
-    const errs = validate(v, { name: [required('Name')], password: [(x) => (x && (x.length < 8 || !/[A-Za-z]/.test(x) || !/\d/.test(x)) ? 'At least 8 characters with a letter and a number' : null)] });
+    const errs = validate(v, { name: [required('Name'), personName('Name')], password: [(x) => (x && (x.length < 8 || !/[A-Za-z]/.test(x) || !/\d/.test(x)) ? 'At least 8 characters with a letter and a number' : null)] });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
     const body: any = { name: v.name, role: v.role, hourlyRate: Number(v.hourlyRate) || 0 };

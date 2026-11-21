@@ -1,15 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { post } from '../api';
 import { Field, useAction, useForm } from './ui';
-import { email, minLen, normPhone, phone, range, required, validate } from '../validators';
+import { addressText, cityName, email, normPhone, personName, phone, range, required, safeText, validate } from '../validators';
 
 /** Public enquiry form (no login). The enquiry lands in the sales team's list immediately. */
 export default function EnquiryForm({ initialKw = '3', initialType = 'on_grid', title = 'Request a free quote', compact = false }: {
   initialKw?: string; initialType?: string; title?: string;
-  /** Short version for the website hero: email, city and message sit behind "More details". */
+  /** Tighter spacing for the website hero. */
   compact?: boolean;
 }) {
-  const [more, setMore] = useState(!compact);
   const f = useForm({
     name: '', phone: '', email: '', address: '', city: '', requestedKw: initialKw, systemType: initialType, subsidyRequired: false, message: '',
   });
@@ -20,11 +19,13 @@ export default function EnquiryForm({ initialKw = '3', initialType = 'on_grid', 
     e.preventDefault();
     const v = f.values;
     const errs = validate(v, {
-      name: [required('Name'), minLen(2, 'Name')],
+      name: [required('Name'), personName('Name')],
       phone: [required('Phone number'), phone],
       email: [email],
-      address: [required('Address'), minLen(8, 'Address')],
-      requestedKw: [required('System size'), range(1, 5, 'System size')],
+      address: [required('Address'), addressText('Address')],
+      city: [cityName],
+      message: [safeText('Message', 500)],
+      requestedKw: [required('System size'), range(1, 5, 'System size'), (x: any) => (Number.isInteger(Number(x)) ? null : 'System size must be a whole number')],
     });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -48,11 +49,11 @@ export default function EnquiryForm({ initialKw = '3', initialType = 'on_grid', 
       {title && <h2>{title}</h2>}
       {error && !Object.keys(f.errors).length && <div className="alert bad" role="alert">{error}</div>}
       <div className="form-grid">
-        <Field label="Full name" required error={f.errors.name}><input {...f.bind('name')} autoComplete="name" /></Field>
-        <Field label="Mobile number" required error={f.errors.phone} hint="10 digits, e.g. 98765 43210"><input inputMode="tel" autoComplete="tel" {...f.bind('phone')} /></Field>
-        {more && <Field label="Email (optional)" error={f.errors.email}><input type="email" autoComplete="email" {...f.bind('email')} /></Field>}
-        {more && <Field label="City" error={f.errors.city}><input {...f.bind('city')} /></Field>}
-        <Field label="Installation address" required error={f.errors.address} className="full"><input {...f.bind('address')} autoComplete="street-address" /></Field>
+        <Field label="Full name" required error={f.errors.name}><input {...f.bind('name')} autoComplete="name" maxLength={60} /></Field>
+        <Field label="Mobile number" required error={f.errors.phone} hint=""><input inputMode="tel" autoComplete="tel" maxLength={15} {...f.bind('phone')} /></Field>
+        <Field label="Email" error={f.errors.email}><input type="email" autoComplete="email" maxLength={100} {...f.bind('email')} /></Field>
+        <Field label="City" error={f.errors.city}><input {...f.bind('city')} autoComplete="address-level2" maxLength={60} /></Field>
+        <Field label="Installation address" required error={f.errors.address} className="full"><input {...f.bind('address')} autoComplete="street-address" maxLength={200} /></Field>
         <Field label="System size" required error={f.errors.requestedKw}>
           <select {...f.bind('requestedKw')}>{[1, 2, 3, 4, 5].map((k) => <option key={k} value={k}>{k} kW</option>)}</select>
         </Field>
@@ -60,9 +61,8 @@ export default function EnquiryForm({ initialKw = '3', initialType = 'on_grid', 
           <select {...f.bind('systemType')}><option value="on_grid">On-Grid (grid connected)</option><option value="off_grid">Off-Grid (with battery)</option></select>
         </Field>
         <label className="check full"><input type="checkbox" checked={f.values.subsidyRequired} onChange={(e) => f.set('subsidyRequired', e.target.checked)} /> I want help claiming the government subsidy</label>
-        {more && <Field label="Anything else we should know?" error={f.errors.message} className="full"><textarea {...f.bind('message')} /></Field>}
+        <Field label="Anything else we should know? (optional)" error={f.errors.message} className="full"><textarea rows={compact ? 2 : 3} maxLength={500} {...f.bind('message')} /></Field>
       </div>
-      {compact && !more && <button type="button" className="more-link" onClick={() => setMore(true)}>+ Add email, city or a message</button>}
       <button className="btn" disabled={busy}>{busy ? 'Sending…' : 'Request free quote'}</button>
     </form>
   );

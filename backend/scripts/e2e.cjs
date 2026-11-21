@@ -50,7 +50,7 @@ async function login(name) {
 
   console.log('Enquiry -> survey -> quote');
   const stamp = String(Date.now()).slice(-6);
-  const enq = await ok('public enquiry accepted', call('POST', '/public/enquiries', { body: { name: 'E2E Customer', phone: `98${stamp}12`.slice(0, 10).padEnd(10, '1'), email: `e2e${stamp}@example.com`, address: '21 Sunrise Society, Ahmedabad', city: 'Ahmedabad', requestedKw: 3, systemType: 'on_grid', subsidyRequired: true } }), 201);
+  const enq = await ok('public enquiry accepted', call('POST', '/public/enquiries', { body: { name: 'Eetoo Customer', phone: `98${stamp}12`.slice(0, 10).padEnd(10, '1'), email: `e2e${stamp}@example.com`, address: '21 Sunrise Society, Ahmedabad', city: 'Ahmedabad', requestedKw: 3, systemType: 'on_grid', subsidyRequired: true } }), 201);
   const enquiryId = enq.id;
   await fails('survey blocked before qualification', call('POST', '/surveys', { token: tokens.sales, body: { enquiryId, technicianId: 4, scheduledDate: '2099-01-01' } }), 422);
   await fails('cannot qualify without checklist', call('POST', `/enquiries/${enquiryId}/qualify`, { token: tokens.sales, body: { decision: 'qualified' } }), 422, 'checklist');

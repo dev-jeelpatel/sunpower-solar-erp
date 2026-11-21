@@ -1,7 +1,7 @@
-import { id, money, optionalEmail, optionalPhone, serial, text, z } from '../../lib/zod';
+import { businessName, id, money, optionalEmail, optionalPhone, serial, text, z } from '../../lib/zod';
 
 export const supplierSchema = z.object({
-  name: text('Supplier name', { min: 2, max: 120 }),
+  name: businessName('Supplier name'),
   phone: optionalPhone,
   email: optionalEmail,
 });

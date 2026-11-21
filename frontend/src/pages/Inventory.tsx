@@ -5,7 +5,7 @@ import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, Pager, Seg, Tabs, fmtDate, label, money, useAction, useAsync, useDebounced, useForm, useToast } from '../components/ui';
 import { Chips, Kpi, KpiRow, Meter, Person, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
-import { validate, required, positive, isPhone, isEmail } from '../validators';
+import { validate, required, positive, isPhone, isEmail, businessName } from '../validators';
 
 const CAT_ICON: Record<string, IconName> = {
   panel: 'sun', inverter: 'zap', battery: 'cube', charge_controller: 'zap', wiring_box: 'box', switch: 'zap',
@@ -277,7 +277,8 @@ function SupplierForm({ s, onClose, onDone }) {
   const submit = async () => {
     const v = f.values;
     const errs: Record<string, string> = {};
-    if (v.name.trim().length < 2) errs.name = 'Enter the supplier name';
+    const nameErr = v.name.trim() ? businessName('Supplier name')(v.name) : 'Enter the supplier name';
+    if (nameErr) errs.name = nameErr;
     if (v.phone && !isPhone(v.phone)) errs.phone = 'Enter a valid 10-digit mobile number';
     if (v.email && !isEmail(v.email)) errs.email = 'Enter a valid email address';
     f.setErrors(errs);

@@ -5,7 +5,7 @@ import { useCurrentUser, can } from '../auth';
 import { Icon, type IconName } from '../components/icons';
 import { Avatar } from '../components/kit';
 import { Badge, Card, Empty, Field, Loading, Modal, PageHead, Pager, label, fmtDate, useAction, useAsync, useDebounced, useForm, useToast, Async } from '../components/ui';
-import { validate, required, minLen, email, phone, normPhone, range } from '../validators';
+import { validate, required, personName, addressText, email, phone, normPhone, range } from '../validators';
 
 const STATUSES = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won', 'lost'];
 
@@ -14,7 +14,7 @@ function NewEnquiry({ onClose, onDone }) {
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const v = f.values;
-    const errs = validate(v, { name: [required('Name'), minLen(2, 'Name')], phone: [required('Phone'), phone], email: [email], address: [required('Address'), minLen(8, 'Address')], requestedKw: [range(1, 5, 'System size')] });
+    const errs = validate(v, { name: [required('Name'), personName('Name')], phone: [required('Phone'), phone], email: [email], address: [required('Address'), addressText('Address')], requestedKw: [range(1, 5, 'System size')] });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
     const ok = await run(() => post('/enquiries', { ...v, phone: normPhone(v.phone), requestedKw: Number(v.requestedKw) }), 'Enquiry added');

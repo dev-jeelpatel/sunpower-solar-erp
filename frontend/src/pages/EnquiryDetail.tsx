@@ -4,7 +4,7 @@ import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { Tracker } from '../components/kit';
-import { validate, required, positive, minLen, email as emailRule, phone as phoneRule } from '../validators';
+import { validate, required, positive, personName, addressText, cityName, safeText, email as emailRule, phone as phoneRule } from '../validators';
 
 const FLOW = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won'];
 const FLOW_LABEL: Record<string, string> = {
@@ -124,7 +124,7 @@ function EditEnquiry({ e, onClose, onDone }) {
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const v = f.values;
-    const errs = validate(v, { name: [required('Name')], phone: [required('Mobile number'), phoneRule], email: [emailRule], address: [required('Address'), minLen(8, 'Address')] });
+    const errs = validate(v, { name: [required('Name'), personName('Name')], phone: [required('Mobile number'), phoneRule], email: [emailRule], address: [required('Address'), addressText('Address')], city: [cityName], message: [safeText('Message', 500)] });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
     if (await run(() => put(`/enquiries/${e.id}`, { ...v, requestedKw: Number(v.requestedKw) }), 'Enquiry updated')) onDone();

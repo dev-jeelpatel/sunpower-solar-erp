@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, fmtDate, money, useAction, useAsync, useDebounced, useForm } from '../components/ui';
-import { validate, required, minLen, email as emailRule, phone as phoneRule } from '../validators';
+import { validate, required, personName, addressText, cityName, email as emailRule, phone as phoneRule } from '../validators';
 import { Kpi, KpiRow, Person, Tag } from '../components/kit';
 import { Icon, type IconName } from '../components/icons';
 
@@ -11,7 +11,7 @@ function CustomerForm({ c, onClose, onDone }) {
   const f = useForm({ name: c?.name || '', phone: c?.phone || '', email: c?.email || '', address: c?.address || '', city: c?.city || '' });
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
-    const errs = validate(f.values, { name: [required('Name'), minLen(2, 'Name')], phone: [required('Mobile number'), phoneRule], email: [emailRule], address: [required('Address'), minLen(5, 'Address')] });
+    const errs = validate(f.values, { name: [required('Name'), personName('Name')], phone: [required('Mobile number'), phoneRule], email: [emailRule], address: [required('Address'), addressText('Address')], city: [cityName] });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
     if (await run(() => (c ? put(`/customers/${c.id}`, f.values) : post('/customers', f.values)), 'Customer saved')) onDone();
