@@ -1,3 +1,4 @@
+import RevenueChart from '../components/RevenueChart';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { get } from '../api';
@@ -7,8 +8,8 @@ import { Async, Empty, Seg, label, money, useAsync } from '../components/ui';
 
 const PIPE_ORDER = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won', 'lost'];
 const PIPE_TONE: Record<string, string> = {
-  new: '#6366f1', contacted: '#3b82f6', qualified: '#0ea5e9', survey_scheduled: '#14b8a6',
-  survey_approved: '#10b981', quoted: '#f59e0b', won: '#16a34a', lost: '#ef4444',
+  new: '#c7d2fe', contacted: '#a5b4fc', qualified: '#818cf8', survey_scheduled: '#6366f1',
+  survey_approved: '#4f46e5', quoted: '#4338ca', won: '#16a34a', lost: '#ef4444',
 };
 
 type Tone = 'indigo' | 'blue' | 'green' | 'amber' | 'rose' | 'violet';
@@ -24,38 +25,6 @@ function Kpi({ icon, tone, label: l, value, sub }: { icon: IconName; tone: Tone;
         <span className="kpi-label">{l}</span>
         <b className="kpi-value">{value}</b>
         {sub && <span className="kpi-sub">{sub}</span>}
-      </div>
-    </div>
-  );
-}
-
-/** Bar chart with gridlines, a y-axis and a hover read-out. */
-function CollectionsChart({ data }: { data: { label: string; collected: number }[] }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(...data.map((d) => d.collected), 1);
-  const top = Math.ceil(max / 10 ** (String(Math.ceil(max)).length - 1)) * 10 ** (String(Math.ceil(max)).length - 1);
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => top * t);
-  const total = data.reduce((s, d) => s + d.collected, 0);
-  const shown = hover != null ? data[hover] : null;
-  return (
-    <div className="chart">
-      <div className="chart-sum">
-        <div><span>{shown ? shown.label : 'Last 6 months'}</span><b>{money(shown ? shown.collected : total)}</b></div>
-        <small>{shown ? 'collected that month' : 'total collected'}</small>
-      </div>
-      <div className="chart-plot" role="img" aria-label="Collections for the last six months">
-        <div className="chart-y">{[...ticks].reverse().map((t) => <span key={t}>{short(t)}</span>)}</div>
-        <div className="chart-area">
-          <div className="chart-grid">{ticks.map((t) => <i key={t} />)}</div>
-          <div className="chart-bars">
-            {data.map((d, i) => (
-              <div key={d.label} className={`cbar ${hover === i ? 'on' : ''}`} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-                <div className="cbar-track"><i style={{ height: `${Math.max((d.collected / top) * 100, d.collected ? 3 : 0)}%` }} /></div>
-                <span>{d.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -80,39 +49,55 @@ const PIPE_STAGES: [string, string][] = [
   ['new', 'New'], ['contacted', 'Contacted'], ['qualified', 'Qualified'], ['survey_scheduled', 'Survey booked'],
   ['survey_approved', 'Survey approved'], ['quoted', 'Quote sent'], ['won', 'Won'], ['lost', 'Lost'],
 ];
+const OPEN_STAGES = PIPE_STAGES.slice(0, 6);
 
-/** Sales pipeline: a ring split by stage, with a legend you can hover and click (opens the enquiries at that stage). */
+/**
+ * Sales pipeline. The ring shows where every enquiry ended up; the tiles split it into in progress, won and lost;
+ * and the bars below show how the open ones are spread across the stages (a click opens the enquiries at that stage).
+ */
 function Pipeline({ data }: { data: { status: string; n: number }[] }) {
   const [hot, setHot] = useState<string | null>(null);
   const nOf = (s: string) => data.find((p) => p.status === s)?.n || 0;
   const total = data.reduce((a, b) => a + b.n, 0);
   if (total === 0) return <Empty>No enquiries yet</Empty>;
 
+  const won = nOf('won'), lost = nOf('lost');
+  const open = OPEN_STAGES.reduce((a, [s]) => a + nOf(s), 0);
+  const decided = won + lost;
+  const winRate = decided ? Math.round((won / decided) * 100) : 0;
+  const pct = (n: number) => (n / total) * 100;
+  const maxOpen = Math.max(...OPEN_STAGES.map(([s]) => nOf(s)), 1);
+
   const R = 46;
   const C = 2 * Math.PI * R;
-  const GAP = 2.2;
+  const GAP = 2;
   let acc = 0;
   const segs = PIPE_STAGES.filter(([s]) => nOf(s) > 0).map(([s, l]) => {
     const frac = nOf(s) / total;
-    const len = Math.max(frac * C - GAP, 0.6);
+    const len = Math.max(frac * C - GAP, 1.2);
     const seg = { s, l, len, offset: -acc };
     acc += frac * C;
     return seg;
   });
   const hotStage = hot ? PIPE_STAGES.find(([s]) => s === hot) : null;
-  const won = nOf('won');
+
+  const tiles: { key: string; to: string; label: string; n: number; tone: string; sub: string }[] = [
+    { key: 'open', to: '/enquiries', label: 'In progress', n: open, tone: '#6366f1', sub: `${pct(open).toFixed(0)}% of all enquiries` },
+    { key: 'won', to: '/enquiries?status=won', label: 'Won', n: won, tone: '#16a34a', sub: `${pct(won).toFixed(0)}% of all enquiries` },
+    { key: 'lost', to: '/enquiries?status=lost', label: 'Lost', n: lost, tone: '#ef4444', sub: `${pct(lost).toFixed(0)}% of all enquiries` },
+  ];
 
   return (
-    <div className="dn">
-      <div className="dn-ring">
+    <div className="pl2-wrap"><div className="pl2">
+      <div className="pl2-ring">
         <svg viewBox="0 0 120 120" role="img" aria-label="Enquiries by stage">
-          <circle cx="60" cy="60" r={R} fill="none" stroke="#eef1f7" strokeWidth="14" />
+          <circle cx="60" cy="60" r={R} fill="none" stroke="#eef1f7" strokeWidth="13" />
           <g transform="rotate(-90 60 60)">
             {segs.map((g, i) => (
               <circle
-                key={g.s} cx="60" cy="60" r={R} fill="none" stroke={PIPE_TONE[g.s]} strokeLinecap="butt"
-                strokeWidth={hot === g.s ? 18 : 14} strokeDasharray={`${g.len} ${C - g.len}`} strokeDashoffset={g.offset}
-                opacity={hot && hot !== g.s ? 0.35 : 1} className="dn-seg" style={{ animationDelay: `${i * 70}ms`, '--c': C } as any}
+                key={g.s} cx="60" cy="60" r={R} fill="none" stroke={PIPE_TONE[g.s]} strokeLinecap="round"
+                strokeWidth={hot === g.s ? 17 : 13} strokeDasharray={`${g.len} ${C - g.len}`} strokeDashoffset={g.offset}
+                opacity={hot && hot !== g.s ? 0.3 : 1} className="dn-seg" style={{ animationDelay: `${i * 70}ms`, '--c': C } as any}
                 onMouseEnter={() => setHot(g.s)} onMouseLeave={() => setHot(null)}
               />
             ))}
@@ -121,26 +106,41 @@ function Pipeline({ data }: { data: { status: string; n: number }[] }) {
         <div className="dn-mid">
           <b>{hotStage ? nOf(hotStage[0]) : total}</b>
           <span>{hotStage ? hotStage[1] : 'enquiries'}</span>
-          {!hotStage && <em>{total ? Math.round((won / total) * 100) : 0}% won</em>}
-          {hotStage && <em>{Math.round((nOf(hotStage[0]) / total) * 100)}% of all</em>}
+          {hotStage ? <em>{pct(nOf(hotStage[0])).toFixed(0)}% of all</em> : <em title="Won out of all the enquiries that ended in a yes or a no">{winRate}% win rate</em>}
         </div>
       </div>
-      <ul className="dn-legend">
-        {PIPE_STAGES.map(([s, l]) => {
-          const n = nOf(s);
-          return (
-            <li key={s} className={`${hot === s ? 'on' : ''} ${n === 0 ? 'zero' : ''}`} onMouseEnter={() => setHot(s)} onMouseLeave={() => setHot(null)}>
-              <Link to={`/enquiries?status=${s}`}>
-                <i style={{ background: PIPE_TONE[s] }} />
-                <span>{l}</span>
-                <b>{n}</b>
-                <em>{Math.round((n / total) * 100)}%</em>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+
+      <div className="pl2-side">
+        <div className="pl2-tiles">
+          {tiles.map((t) => (
+            <Link key={t.key} to={t.to} className="pl2-tile" style={{ '--c': t.tone } as any}>
+              <span><i />{t.label}</span>
+              <b>{t.n.toLocaleString('en-IN')}</b>
+              <small>{t.sub}</small>
+            </Link>
+          ))}
+        </div>
+
+        <div className="pl2-stages">
+          <h3>In progress by stage</h3>
+          <ul>
+            {OPEN_STAGES.map(([s, l]) => {
+              const n = nOf(s);
+              return (
+                <li key={s} className={`${hot === s ? 'on' : ''} ${n === 0 ? 'zero' : ''}`} onMouseEnter={() => setHot(s)} onMouseLeave={() => setHot(null)}>
+                  <Link to={`/enquiries?status=${s}`}>
+                    <span className="pl2-name"><i style={{ background: PIPE_TONE[s] }} />{l}</span>
+                    <span className="pl2-bar"><u style={{ width: `${(n / maxOpen) * 100}%`, background: PIPE_TONE[s] }} /></span>
+                    <b>{n}</b>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="pl2-foot">Win rate <b>{winRate}%</b> of {decided.toLocaleString('en-IN')} decided enquiries ({won.toLocaleString('en-IN')} won, {lost.toLocaleString('en-IN')} lost)</p>
+        </div>
+      </div>
+    </div></div>
   );
 }
 
@@ -191,8 +191,8 @@ export default function Dashboard() {
 
             <div className="grid split">
               <section className="card dcard">
-                <div className="dcard-head"><div><h2>Collections</h2><p>Cash received per month</p></div></div>
-                <CollectionsChart data={d.trend} />
+                <div className="dcard-head"><div><h2>Revenue</h2><p>Cash collected and new orders booked, month by month</p></div></div>
+                <RevenueChart data={d.trend} />
               </section>
 
               <section className="card dcard">
