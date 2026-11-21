@@ -14,6 +14,7 @@
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed/seed.ts",
+    "db:catalog": "tsx prisma/seed/catalog.ts",
     "db:reseed": "tsx prisma/seed/seed.ts --reset",
     "db:setup": "prisma migrate deploy && tsx prisma/seed/seed.ts",
     "db:embedded": "tsx scripts/dev-db.ts",
