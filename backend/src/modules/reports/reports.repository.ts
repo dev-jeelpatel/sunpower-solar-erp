@@ -33,9 +33,12 @@ export const reportsRepository = {
   trend: () =>
     q(
       prisma,
-      `SELECT to_char(m, 'Mon YY') AS label, COALESCE(SUM(p.amount),0) AS collected
-         FROM generate_series(date_trunc('month', now()) - interval '5 months', date_trunc('month', now()), interval '1 month') m
-         LEFT JOIN payments p ON date_trunc('month', p.paid_at) = m GROUP BY m ORDER BY m`,
+      `SELECT to_char(m, 'YYYY-MM-DD') AS month, to_char(m, 'Mon YY') AS label,
+              COALESCE((SELECT SUM(p.amount) FROM payments p WHERE date_trunc('month', p.paid_at) = m), 0)::float AS collected,
+              COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.status <> 'cancelled' AND date_trunc('month', o.created_at) = m), 0)::float AS billed,
+              (SELECT count(*) FROM orders o WHERE o.status <> 'cancelled' AND date_trunc('month', o.created_at) = m)::int AS orders
+         FROM generate_series(date_trunc('month', now()) - interval '11 months', date_trunc('month', now()), interval '1 month') m
+        ORDER BY m`,
     ),
   lowStock: () =>
     q(prisma, 'SELECT sku, name, on_hand, reorder_level FROM v_stock WHERE active AND on_hand <= reorder_level AND reorder_level > 0 ORDER BY on_hand LIMIT 8'),
