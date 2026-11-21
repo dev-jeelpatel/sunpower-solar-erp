@@ -207,24 +207,28 @@ function Solutions({ onPick }: { onPick: (p: QuotePick) => void }) {
         <button className={kind === 'off_grid' ? 'on' : ''} onClick={() => setKind('off_grid')}>Off-Grid <small>with battery backup</small></button>
       </div>
       <p className="muted center" style={{ marginTop: 12 }}>{kind === 'on_grid' ? 'Best for homes with reliable grid power. Export extra units and qualify for the central subsidy.' : 'Best where power cuts are frequent or there is no grid. Includes a battery bank for night-time and backup use.'}</p>
-      {pkgs === null ? <div className="spinner" /> : (
+      {pkgs === null ? <div className="spinner" /> : list.length === 0 ? (
+        <div className="pkg-empty"><b>Packages are being updated</b><p>Tell us your roof size and monthly bill in the form above and an advisor will send a clear quote.</p><button className="s-btn primary" onClick={() => scrollTo('quote')}>Get a free quote</button></div>
+      ) : (
         <div className="pkg-grid">{list.map((p) => {
           const total = Math.round(p.list_price * (1 + GST));
           return (
             <article className={`pkg rv ${p.capacity_kw === 3 ? 'hot' : ''}`} key={p.id}>
               {p.capacity_kw === 3 && <span className="ribbon">Most popular</span>}
-              <header><h3>{p.capacity_kw} kW</h3><span className="tag">{kind === 'on_grid' ? 'On-Grid' : 'Off-Grid'}</span></header>
-              <div className="price">{money(total)}<small> incl. GST</small></div>
-              <div className="covers">Covers a bill of about <b>{money(p.capacity_kw * UNITS_PER_KW_MONTH * TARIFF)}</b> a month</div>
+              <header><h3>{p.capacity_kw}<small>kW</small></h3><span className="tag">{kind === 'on_grid' ? 'On-Grid' : 'Off-Grid'}</span></header>
+              <div className="price">{money(total)}<small>incl. GST</small></div>
+              <div className="covers">Suits a bill of about <b>{money(p.capacity_kw * UNITS_PER_KW_MONTH * TARIFF)}</b> a month</div>
               <ul>
-                <li><Ico n="check" /> {p.panels} × 540 W solar panels</li>
-                <li><Ico n="check" /> {p.capacity_kw} kW inverter &amp; charge controller</li>
-                <li><Ico n="check" /> Mounting stands, wiring &amp; earthing</li>
-                {kind === 'off_grid' && <li><Ico n="check" /> Battery bank for backup</li>}
-                <li><Ico n="check" /> Installation, testing &amp; sign-off</li>
+                <li><Ico n="check" />{p.panels} solar panels (540 W)</li>
+                <li><Ico n="check" />{p.capacity_kw} kW inverter</li>
+                <li><Ico n="check" />Stands &amp; wiring</li>
+                {kind === 'off_grid' && <li><Ico n="check" />Battery bank for backup</li>}
+                <li><Ico n="check" />Installation &amp; testing</li>
               </ul>
-              {kind === 'on_grid' && <div className="sub-note">Subsidy up to <b>{money(subsidyFor(p.capacity_kw))}</b></div>}
-              <button className="s-btn primary block" onClick={() => { onPick({ kw: String(p.capacity_kw), type: p.kind }); scrollTo('quote'); }}>Get this quote</button>
+              <div className="pkg-foot">
+                {kind === 'on_grid' ? <div className="sub-note">Subsidy up to <b>{money(subsidyFor(p.capacity_kw))}</b></div> : <div className="sub-note none">Works without the grid</div>}
+                <button className="s-btn primary block" onClick={() => { onPick({ kw: String(p.capacity_kw), type: p.kind }); scrollTo('quote'); }}>Get this quote</button>
+              </div>
             </article>
           );
         })}</div>
