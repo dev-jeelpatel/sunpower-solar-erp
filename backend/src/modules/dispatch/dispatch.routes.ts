@@ -12,6 +12,7 @@ const warehouse = authorize('warehouse');
 dispatchRouter.get('/', c.list);
 dispatchRouter.get('/:id', validate(idParam, 'params'), c.get);
 dispatchRouter.post('/:id/scan', warehouse, validate(idParam, 'params'), validate(scanSchema), c.scan);
+dispatchRouter.post('/:id/autofill', warehouse, validate(idParam, 'params'), c.autofill);
 dispatchRouter.delete('/:id/scan/:serial', warehouse, validate(idParam, 'params'), c.unscan);
 dispatchRouter.post('/:id/dispatch', warehouse, validate(idParam, 'params'), validate(dispatchSchema), c.dispatch);
 dispatchRouter.post('/:id/deliver', authorize('warehouse', 'technician'), validate(idParam, 'params'), c.deliver);

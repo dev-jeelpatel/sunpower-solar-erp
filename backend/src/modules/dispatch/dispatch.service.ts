@@ -1,5 +1,5 @@
 import { notFound, unprocessable } from '../../lib/errors';
-import { type Db, logActivity, prisma, tx } from '../../lib/prisma';
+import { type Db, logActivity, prisma, q, tx } from '../../lib/prisma';
 import { dispatchRepository as repo } from './dispatch.repository';
 
 const OPEN = ['pending', 'packing'];
@@ -12,11 +12,16 @@ export const dispatchService = {
     const header = await repo.header(db, id);
     if (!header) throw notFound('Dispatch');
     const lines = await repo.lines(db, id, header.order_id);
-    const items = lines.map((l) => ({
+    const open = OPEN.includes(header.status);
+    const items = await Promise.all(lines.map(async (l) => ({
       ...l,
+      // oldest in-stock serials for this product: the warehouse can tap one instead of typing it
+      suggested: open && l.tracked_serial && l.scanned.length < l.required
+        ? (await q<{ serial_no: string }>(db, "SELECT serial_no FROM inventory_units WHERE product_id = $1 AND status = 'in_stock' ORDER BY id LIMIT $2", [l.product_id, l.required - l.scanned.length])).map((r) => r.serial_no)
+        : [],
       scannedCount: l.scanned.length,
       complete: l.tracked_serial ? l.scanned.length >= l.required : l.on_hand >= l.required,
-    }));
+    })));
     const value = items.reduce((s, l) => s + l.unit_price * (l.tracked_serial ? l.scannedCount : l.required), 0);
     return { ...header, items, ready: items.every((l) => l.complete), value };
   },
@@ -39,6 +44,13 @@ export const dispatchService = {
       await repo.movement(db, unit.product_id, -1, 'dispatch', id, userId);
       await repo.setStatus(db, id, 'packing');
     });
+    return this.get(id);
+  },
+
+  /** Demo helper for sites without a barcode scanner: scan the oldest in-stock serial for every missing unit. */
+  async autofill(id: number, userId: number) {
+    const info = await this.get(id);
+    for (const l of info.items) for (const serial of l.suggested) await this.scan(id, serial, userId);
     return this.get(id);
   },
 
