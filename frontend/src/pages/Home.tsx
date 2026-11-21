@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { get, ApiError } from '../api';
 import EnquiryForm from '../components/EnquiryForm';
@@ -36,13 +36,77 @@ const GST = 0.05;
 const TARIFF = 7; // assumed Rs per unit, shown to the user as an assumption
 const UNITS_PER_KW_MONTH = 120; // ~4 units a day per kW
 
+// ---------- motion helpers ----------
+/** Adds `in` to any `.rv` element once it scrolls into view (also catches elements that render later). */
+function useReveal() {
+  useEffect(() => {
+    const root = document.querySelector('.site');
+    if (!root) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    }), { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    const seen = new WeakSet<Element>(); // per effect run, so a remount (React strict mode) re-observes everything
+    const scan = () => root.querySelectorAll('.rv:not(.in)').forEach((el) => {
+      if (seen.has(el)) return;
+      seen.add(el);
+      if (reduce) { el.classList.add('in'); return; }
+      io.observe(el);
+    });
+    scan();
+    const mo = new MutationObserver(scan);
+    mo.observe(root, { childList: true, subtree: true });
+    return () => { io.disconnect(); mo.disconnect(); };
+  }, []);
+}
+
+/** Scroll position and page progress (0-100) for the sticky nav, progress bar and mobile CTA. */
+function useScroll() {
+  const [s, setS] = useState({ y: 0, pct: 0 });
+  useEffect(() => {
+    const on = () => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      setS({ y: window.scrollY, pct: h > 0 ? Math.min(100, (window.scrollY / h) * 100) : 0 });
+    };
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
+  return s;
+}
+
+/** Number that counts up the first time it is seen. */
+function CountUp({ to, prefix = '', suffix = '' }: { to: number; prefix?: string; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setV(to); return; }
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      io.disconnect();
+      const t0 = performance.now();
+      const tick = (t: number) => {
+        const p = Math.min(1, (t - t0) / 1400);
+        setV(Math.round(to * (1 - Math.pow(1 - p, 3))));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }, { threshold: 0.4 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [to]);
+  return <span ref={ref}>{prefix}{v.toLocaleString('en-IN')}{suffix}</span>;
+}
+
 // ---------- sections ----------
-function Nav() {
+function Nav({ scrolled }: { scrolled: boolean }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const go = (id: string) => { setOpen(false); scrollTo(id); };
   return (
-    <header className="site-nav">
+    <header className={`site-nav ${scrolled || open ? 'scrolled' : ''}`}>
       <div className="wrap row between">
         <Link to="/home" className="site-logo"><span><Ico n="sun" /></span>SunPower<b>Solutions</b></Link>
         <nav className={open ? 'open' : ''} aria-label="Website">
@@ -55,7 +119,7 @@ function Nav() {
           <Link className="staff" to={user ? '/' : '/login'}>{user ? 'Open dashboard' : 'Staff login'}</Link>
           <button className="cta" onClick={() => go('quote')}>Get free quote</button>
         </nav>
-        <button className="burger" aria-label="Menu" onClick={() => setOpen((o) => !o)}><span /><span /><span /></button>
+        <button className="burger" aria-label="Menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}><span /><span /><span /></button>
       </div>
     </header>
   );
@@ -66,50 +130,43 @@ type QuotePick = { kw: string; type: string };
 function Hero({ sel }: { sel: QuotePick }) {
   return (
     <section className="hero-site">
-      <div className="hero-deco" aria-hidden="true">
-        <svg viewBox="0 0 420 360">
-          <defs>
-            <radialGradient id="sg" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#fde68a" /><stop offset="1" stopColor="#f59e0b" /></radialGradient>
-            <linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1e3a8a" /><stop offset="1" stopColor="#0f1f4d" /></linearGradient>
-          </defs>
-          <circle cx="320" cy="80" r="46" fill="url(#sg)" />
-          <g stroke="#fbbf24" strokeWidth="5" strokeLinecap="round">{[0, 45, 90, 135, 180, 225, 270, 315].map((a) => <line key={a} x1={320 + Math.cos((a * Math.PI) / 180) * 62} y1={80 + Math.sin((a * Math.PI) / 180) * 62} x2={320 + Math.cos((a * Math.PI) / 180) * 80} y2={80 + Math.sin((a * Math.PI) / 180) * 80} />)}</g>
-          <path d="M40 330 L40 200 L190 120 L340 200 L340 330 Z" fill="#e2e8f0" />
-          <path d="M20 205 L190 112 L360 205 L330 215 L190 138 L50 215 Z" fill="#334155" />
-          <g transform="translate(86 150) skewY(-28)">
-            {[0, 1, 2].map((r) => [0, 1, 2].map((c) => <rect key={`${r}${c}`} x={c * 38} y={r * 30} width="34" height="26" rx="2" fill="url(#pg)" stroke="#93c5fd" strokeWidth="1" />))}
-          </g>
-          <rect x="150" y="250" width="60" height="80" rx="4" fill="#94a3b8" /><rect x="64" y="240" width="48" height="40" rx="3" fill="#bfdbfe" /><rect x="264" y="240" width="48" height="40" rx="3" fill="#bfdbfe" />
-        </svg>
-      </div>
+      <div className="hero-photo" aria-hidden="true" />
+      <div className="hero-glow" aria-hidden="true" />
       <div className="wrap hero-grid">
-        <div>
+        <div className="hero-copy">
           <span className="eyebrow">Rooftop solar for Indian homes</span>
           <h1>Turn your roof into a <em>power plant</em>. Cut your electricity bill.</h1>
           <p className="lead">From the first call to a 20-year warranty, SunPower looks after everything: roof survey, clear quote, installation, government subsidy paperwork and after-sales support.</p>
           <div className="row" style={{ gap: 12 }}>
-            <button className="s-btn ghost" onClick={() => scrollTo('savings')}>Calculate my savings</button>
+            <button className="s-btn primary" onClick={() => scrollTo('savings')}>Calculate my savings</button>
             <button className="s-btn ghost" onClick={() => scrollTo('how')}>See how it works</button>
           </div>
-          <ul className="ticks">
-            <li><Ico n="check" /> 20-year warranty on panels</li>
-            <li><Ico n="check" /> Subsidy paperwork handled</li>
-            <li><Ico n="check" /> Every part tracked by serial number</li>
-          </ul>
+          <div className="hero-badges">
+            <span><Ico n="shield" /><b>20-year</b> panel warranty</span>
+            <span><Ico n="bank" />Subsidy paperwork <b>handled</b></span>
+            <span><Ico n="search" /><b>Every part</b> tracked by serial</span>
+          </div>
         </div>
         <div id="quote" className="hero-form">
           <div className="hero-form-head"><b>Get your free quote</b><span>Free roof survey. No obligation.</span></div>
           <EnquiryForm key={`${sel.kw}-${sel.type}`} compact initialKw={sel.kw} initialType={sel.type} title="" />
         </div>
       </div>
+      <button className="hero-scroll" onClick={() => scrollTo('how')} aria-label="Scroll to how it works"><i /></button>
     </section>
   );
 }
 
 function Facts() {
-  const facts = [['1 – 5 kW', 'Home system sizes'], ['20 years', 'Panel warranty'], ['24 months', 'Inverter and battery warranty'], ['Up to ₹78,000', 'Central subsidy on 3 kW+']];
   return (
-    <section className="facts"><div className="wrap facts-grid">{facts.map(([v, l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}</div></section>
+    <section className="facts"><div className="wrap">
+      <div className="facts-card rv">
+        <div><span className="f-ic"><Ico n="sun" /></span><b><CountUp to={5} prefix="1 – " suffix=" kW" /></b><span>Home system sizes</span></div>
+        <div><span className="f-ic"><Ico n="shield" /></span><b><CountUp to={20} suffix=" years" /></b><span>Panel warranty</span></div>
+        <div><span className="f-ic"><Ico n="bolt" /></span><b><CountUp to={24} suffix=" months" /></b><span>Inverter and battery warranty</span></div>
+        <div><span className="f-ic"><Ico n="bank" /></span><b><CountUp to={78000} prefix="Up to ₹" /></b><span>Central subsidy on 3 kW+</span></div>
+      </div>
+    </div></section>
   );
 }
 
@@ -126,7 +183,11 @@ function How() {
     <section id="how" className="sec"><div className="wrap">
       <Head eyebrow="How it works" title="From first call to power on, in six clear steps" sub="You always know what happens next, and nothing is quoted or shipped without the previous step being done." />
       <ol className="steps-site">{STEPS.map(([i, t, d], n) => (
-        <li key={t}><span className="num">{n + 1}</span><span className="ic"><Ico n={i} /></span><h3>{t}</h3><p>{d}</p></li>
+        <li key={t} className="rv" style={{ '--d': `${(n % 3) * 90}ms` } as any}>
+          <span className="num">{String(n + 1).padStart(2, '0')}</span>
+          <span className="ic"><Ico n={i} /></span>
+          <h3>{t}</h3><p>{d}</p>
+        </li>
       ))}</ol>
     </div></section>
   );
@@ -149,9 +210,11 @@ function Solutions({ onPick }: { onPick: (p: QuotePick) => void }) {
         <div className="pkg-grid">{list.map((p) => {
           const total = Math.round(p.list_price * (1 + GST));
           return (
-            <article className="pkg" key={p.id}>
+            <article className={`pkg rv ${p.capacity_kw === 3 ? 'hot' : ''}`} key={p.id}>
+              {p.capacity_kw === 3 && <span className="ribbon">Most popular</span>}
               <header><h3>{p.capacity_kw} kW</h3><span className="tag">{kind === 'on_grid' ? 'On-Grid' : 'Off-Grid'}</span></header>
               <div className="price">{money(total)}<small> incl. GST</small></div>
+              <div className="covers">Covers a bill of about <b>{money(p.capacity_kw * UNITS_PER_KW_MONTH * TARIFF)}</b> a month</div>
               <ul>
                 <li><Ico n="check" /> {p.panels} × 540 W solar panels</li>
                 <li><Ico n="check" /> {p.capacity_kw} kW inverter &amp; charge controller</li>
@@ -199,9 +262,9 @@ function Savings({ onPick }: { onPick: (p: QuotePick) => void }) {
   }, [bill, chosenKw, pkgs]);
 
   return (
-    <section id="savings" className="sec"><div className="wrap">
-      <Head eyebrow="Savings calculator" title="See what solar could save you" sub={`Enter your monthly bill and pick a system size. It assumes about ₹${TARIFF} per unit and ${UNITS_PER_KW_MONTH} units a month from each kW. Your roof survey gives the exact figure.`} />
-      <div className="calc">
+    <section id="savings" className="sec dark"><div className="wrap">
+      <Head light eyebrow="Savings calculator" title="See what solar could save you" sub={`Enter your monthly bill and pick a system size. It assumes about ₹${TARIFF} per unit and ${UNITS_PER_KW_MONTH} units a month from each kW. Your roof survey gives the exact figure.`} />
+      <div className="calc rv">
         <div className="calc-in">
           <label htmlFor="bill-num">Your average monthly electricity bill</label>
           <div className="bill-box">
@@ -245,10 +308,11 @@ function Savings({ onPick }: { onPick: (p: QuotePick) => void }) {
 }
 
 function Subsidy() {
-  const rows: [string, string][] = [['1 kW', money(subsidyFor(1))], ['2 kW', money(subsidyFor(2))], ['3 kW and above', money(subsidyFor(3))]];
+  const rows: [string, number][] = [['1 kW', subsidyFor(1)], ['2 kW', subsidyFor(2)], ['3 kW and above', subsidyFor(3)]];
+  const max = subsidyFor(3);
   return (
     <section id="subsidy" className="sec alt"><div className="wrap two">
-      <div>
+      <div className="rv">
         <Head left eyebrow="Government subsidy" title="We handle the subsidy paperwork" sub="Rooftop solar under PM Surya Ghar: Muft Bijli Yojana gets central financial assistance. Tick the subsidy box on your enquiry and we prepare and track the application for you." />
         <ul className="ticks dark">
           <li><Ico n="check" /> Documents prepared with you</li>
@@ -257,9 +321,14 @@ function Subsidy() {
         </ul>
         <p className="small muted">Subsidy is available on grid-connected (on-grid) systems and subject to scheme rules and approval.</p>
       </div>
-      <div className="sub-card">
-        <h3>Central assistance by system size</h3>
-        {rows.map(([k, v]) => <div key={k} className="sub-row"><span>{k}</span><b>{v}</b></div>)}
+      <div className="sub-card rv" style={{ '--d': '120ms' } as any}>
+        <div className="sub-top"><span>Central assistance</span><b><CountUp to={max} prefix="Up to ₹" /></b></div>
+        {rows.map(([k, v]) => (
+          <div key={k} className="sub-bar">
+            <div className="row between"><span>{k}</span><b>{money(v)}</b></div>
+            <div className="sub-track"><i style={{ '--w': `${(v / max) * 100}%` } as any} /></div>
+          </div>
+        ))}
       </div>
     </div></section>
   );
@@ -276,8 +345,21 @@ const WHY: [string, string, string][] = [
 function Why() {
   return (
     <section id="why" className="sec"><div className="wrap">
-      <Head eyebrow="Why SunPower" title="Built around trust, from quote to warranty" sub="Our whole process is designed so nothing falls through the cracks." />
-      <div className="why-grid">{WHY.map(([i, t, d]) => <div className="why" key={t}><span className="ic"><Ico n={i} /></span><h3>{t}</h3><p>{d}</p></div>)}</div>
+      <div className="why-split">
+        <figure className="why-photo rv">
+          <div className="why-img" role="img" aria-label="SunPower engineers walking beside a solar array" />
+          <figcaption>
+            <span><Ico n="shield" /><b>Warranty</b> tied to every serial</span>
+            <span><Ico n="camera" /><b>Photos</b> on every job</span>
+          </figcaption>
+        </figure>
+        <div>
+          <div className="rv"><Head left eyebrow="Why SunPower" title="Built around trust, from quote to warranty" sub="Our whole process is designed so nothing falls through the cracks." /></div>
+          <div className="why-grid">{WHY.map(([i, t, d], n) => (
+            <div className="why rv" key={t} style={{ '--d': `${(n % 2) * 80}ms` } as any}><span className="ic"><Ico n={i} /></span><div><h3>{t}</h3><p>{d}</p></div></div>
+          ))}</div>
+        </div>
+      </div>
     </div></section>
   );
 }
@@ -296,11 +378,11 @@ function Warranty() {
   };
   const state = res?.warranty_state;
   return (
-    <section className="sec alt"><div className="wrap two">
-      <div>
+    <section id="warranty" className="sec alt"><div className="wrap two">
+      <div className="rv">
         <Head left eyebrow="Already a customer?" title="Check your warranty in seconds" sub="Enter the serial number printed on your panel, inverter or battery to see your warranty status." />
       </div>
-      <div className="card-site">
+      <div className="card-site rv" style={{ '--d': '120ms' } as any}>
         <form onSubmit={check} className="lookup">
           <input placeholder="e.g. SP-INV3K-004093" value={serial} onChange={(e) => setSerial(e.target.value)} aria-label="Serial number" />
           <button className="s-btn primary" disabled={busy || serial.trim().length < 6}>{busy ? 'Checking…' : 'Check'}</button>
@@ -333,7 +415,7 @@ function Faq() {
     <section id="faq" className="sec"><div className="wrap narrow">
       <Head eyebrow="FAQ" title="Questions we hear often" />
       <div className="faq">{FAQ.map(([q, a], i) => (
-        <div key={q} className={`faq-item ${open === i ? 'open' : ''}`}>
+        <div key={q} className={`faq-item rv ${open === i ? 'open' : ''}`} style={{ '--d': `${i * 50}ms` } as any}>
           <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>{q}<span>+</span></button>
           {open === i && <p>{a}</p>}
         </div>
@@ -361,17 +443,19 @@ function Footer() {
       <div>
         <div className="site-logo light"><span><Ico n="sun" /></span>SunPower<b>Solutions</b></div>
         <p>Rooftop solar for homes: survey, quote, installation, subsidy and after-sales support in one place.</p>
+        <button className="s-btn primary" style={{ marginTop: 18 }} onClick={() => scrollTo('quote')}>Get a free quote</button>
       </div>
-      <div><h4>Explore</h4><button onClick={() => scrollTo('how')}>How it works</button><button onClick={() => scrollTo('solutions')}>Solutions</button><button onClick={() => scrollTo('savings')}>Savings calculator</button><button onClick={() => scrollTo('faq')}>FAQ</button></div>
-      <div><h4>Customers</h4><button onClick={() => scrollTo('quote')}>Get a free quote</button><Link to="/enquire">Enquiry page</Link></div>
+      <div><h4>Explore</h4><button onClick={() => scrollTo('how')}>How it works</button><button onClick={() => scrollTo('solutions')}>Solutions</button><button onClick={() => scrollTo('savings')}>Savings calculator</button><button onClick={() => scrollTo('subsidy')}>Subsidy</button><button onClick={() => scrollTo('faq')}>FAQ</button></div>
+      <div><h4>Customers</h4><button onClick={() => scrollTo('quote')}>Get a free quote</button><Link to="/enquire">Enquiry page</Link><button onClick={() => scrollTo('warranty')}>Check your warranty</button></div>
       <div><h4>Team</h4><Link to={user ? '/' : '/login'}>{user ? 'Open dashboard' : 'Staff login'}</Link></div>
-    </div><div className="wrap copy">© {new Date().getFullYear()} SunPower Solutions. All rights reserved.</div></footer>
+    </div>
+    <div className="wrap copy"><span>© {new Date().getFullYear()} SunPower Solutions. All rights reserved.</span><button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Back to top ↑</button></div></footer>
   );
 }
 
 function Head({ eyebrow, title, sub, left, light }: { eyebrow: string; title: ReactNode; sub?: ReactNode; left?: boolean; light?: boolean }) {
   return (
-    <div className={`sec-head ${left ? 'left' : ''} ${light ? 'light' : ''}`}>
+    <div className={`sec-head rv ${left ? 'left' : ''} ${light ? 'light' : ''}`}>
       <span className="eyebrow">{eyebrow}</span><h2>{title}</h2>{sub && <p>{sub}</p>}
     </div>
   );
@@ -379,10 +463,13 @@ function Head({ eyebrow, title, sub, left, light }: { eyebrow: string; title: Re
 
 export default function Home() {
   const [sel, setSel] = useState<QuotePick>({ kw: '3', type: 'on_grid' });
+  const { y, pct } = useScroll();
+  useReveal();
   useEffect(() => { document.title = 'SunPower Solutions | Rooftop solar for your home'; return () => { document.title = 'SunPower Solar ERP'; }; }, []);
   return (
     <div className="site">
-      <Nav />
+      <div className="sp-progress" aria-hidden="true"><i style={{ width: `${pct}%` }} /></div>
+      <Nav scrolled={y > 24} />
       <Hero sel={sel} />
       <Facts />
       <How />
@@ -394,6 +481,7 @@ export default function Home() {
       <Faq />
       <CtaBand />
       <Footer />
+      <button className={`mobile-cta ${y > 500 ? 'show' : ''}`} onClick={() => scrollTo('quote')}><Ico n="phone" />Get free quote</button>
     </div>
   );
 }
