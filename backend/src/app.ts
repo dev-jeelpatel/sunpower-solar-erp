@@ -13,6 +13,7 @@ import { authRouter } from './modules/auth/auth.routes';
 import { catalogRouter } from './modules/catalog/catalog.routes';
 import { customersRouter } from './modules/customers/customers.routes';
 import { enquiriesRouter, publicRouter } from './modules/enquiries/enquiries.routes';
+import { inventoryRouter } from './modules/inventory/inventory.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
@@ -47,6 +48,7 @@ app.use('/api/users', usersRouter);
 app.use('/api/enquiries', enquiriesRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api', customersRouter);
+app.use('/api/inventory', inventoryRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
