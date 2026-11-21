@@ -109,7 +109,7 @@ export default function Enquiries() {
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
-  const [all, setAll] = useState(false);
+  const [all, setAll] = useState(true); // salespeople see every enquiry by default; "Assigned to me" narrows it
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<'list' | 'board'>('list');
   const dq = useDebounced(q);
@@ -142,7 +142,12 @@ export default function Enquiries() {
 
       <div className="toolbar">
         <input className="search" placeholder="Search name, phone or city…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-        {user.role === 'sales' && <label className="check"><input type="checkbox" checked={all} onChange={(e) => { setAll(e.target.checked); setPage(1); }} /> Show everyone's</label>}
+        {user.role === 'sales' && (
+          <div className="viewtog" role="group" aria-label="Whose enquiries">
+            <button className={all ? 'on' : ''} onClick={() => { setAll(true); setPage(1); }}>Everyone</button>
+            <button className={!all ? 'on' : ''} onClick={() => { setAll(false); setPage(1); }}>Assigned to me</button>
+          </div>
+        )}
         <div className="toolbar-sp" />
         <div className="viewtog" role="group" aria-label="View">
           <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}><Icon n="list" />List</button>
