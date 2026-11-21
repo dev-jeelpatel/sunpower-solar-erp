@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { get } from '../api';
 import { Async, Badge, Card, Empty, Modal, PageHead, fmtDate, money, useAsync, useDebounced } from '../components/ui';
+import { Kpi, KpiRow, Person, Tag } from '../components/kit';
+import { Icon, type IconName } from '../components/icons';
 
 function Detail({ id, onClose }) {
   const state = useAsync(() => get(`/customers/${id}`), [id]);
@@ -23,19 +25,43 @@ export default function Customers() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<any>(null);
   const dq = useDebounced(q);
-  const state = useAsync(() => get(`/customers?q=${encodeURIComponent(dq)}`), [dq]);
+  const state = useAsync(() => get(`/customers?limit=100&q=${encodeURIComponent(dq)}`), [dq]);
   return (
     <>
       <PageHead title="Customers" sub="Everyone who has placed an order" />
-      <div className="toolbar"><input className="search" placeholder="Search name, phone or city…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-      <Card pad={false}>
-        <Async state={state}>{(d) => d.items.length === 0 ? <Empty>No customers found.</Empty> : (
-          <div className="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Phone</th><th>City</th><th className="num">Orders</th><th className="num">Open tickets</th><th>Since</th></tr></thead>
-            <tbody>{d.items.map((c) => <tr key={c.id} className="clickable" onClick={() => setOpen(c.id)}><td><b>{c.name}</b></td><td>{c.phone}</td><td>{c.city || '-'}</td>
-              <td className="num">{c.orders}</td><td className="num">{c.open_tickets || '-'}</td><td>{fmtDate(c.created_at)}</td></tr>)}</tbody>
-          </table></div>)}</Async>
-      </Card>
+      <Async state={state}>{(d: any) => {
+        const items: any[] = d.items;
+        const orders = items.reduce((a, c) => a + Number(c.orders || 0), 0);
+        const withTickets = items.filter((c) => Number(c.open_tickets) > 0).length;
+        const repeat = items.filter((c) => Number(c.orders) > 1).length;
+        return (
+          <div className="page-stack">
+            <KpiRow>
+              <Kpi icon="users" tone="indigo" label="Customers" value={items.length} sub={dq ? `matching “${dq}”` : 'on your books'} />
+              <Kpi icon="box" tone="blue" label="Orders placed" value={orders} sub="across all customers" />
+              <Kpi icon="user" tone="green" label="Repeat customers" value={repeat} sub="more than one order" />
+              <Kpi icon="ticket" tone={withTickets ? 'rose' : 'amber'} label="With open tickets" value={withTickets} sub={withTickets ? 'need support attention' : 'all clear'} />
+            </KpiRow>
+            <div className="toolbar" style={{ margin: 0 }}><input className="search" placeholder="Search name, phone or city…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+            <Card pad={false}>
+              {items.length === 0 ? <Empty>No customers found.</Empty> : (
+                <div className="table-wrap"><table>
+                  <thead><tr><th>Customer</th><th>City</th><th>Orders</th><th>Open tickets</th><th>Customer since</th><th /></tr></thead>
+                  <tbody>{items.map((c) => (
+                    <tr key={c.id} className="clickable" onClick={() => setOpen(c.id)}>
+                      <td><Person name={c.name} sub={c.phone} /></td>
+                      <td><span className="ico-txt"><Icon n="pin" />{c.city || '-'}</span></td>
+                      <td>{Number(c.orders) > 1 ? <Tag tone="violet">{c.orders} orders · repeat</Tag> : <Tag>{c.orders} order{Number(c.orders) === 1 ? '' : 's'}</Tag>}</td>
+                      <td>{Number(c.open_tickets) > 0 ? <Tag tone="rose">{c.open_tickets} open</Tag> : <span className="muted">None</span>}</td>
+                      <td className="nowrap">{fmtDate(c.created_at)}</td>
+                      <td className="num"><a className="callbtn" href={`tel:${c.phone}`} onClick={(e) => e.stopPropagation()} aria-label={`Call ${c.name}`} title={`Call ${c.name}`}><Icon n="phone" /></a></td>
+                    </tr>))}</tbody>
+                </table></div>
+              )}
+            </Card>
+          </div>
+        );
+      }}</Async>
       {open && <Detail id={open} onClose={() => setOpen(null)} />}
     </>
   );

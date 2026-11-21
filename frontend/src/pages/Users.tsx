@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { get, patch, post } from '../api';
 import { Async, Badge, Card, Field, Modal, PageHead, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { Chips, Kpi, KpiRow, Person, Tag } from '../components/kit';
+import { Icon, type IconName } from '../components/icons';
 import { validate, required, minLen, email, phone } from '../validators';
 
 const ROLES = ['admin', 'sales', 'technician', 'warehouse', 'support', 'director'];
@@ -31,18 +33,48 @@ function NewUser({ onClose, onDone }) {
   );
 }
 
+const ROLE_TONE: Record<string, 'violet' | 'blue' | 'green' | 'amber' | 'rose' | 'slate'> = {
+  admin: 'violet', sales: 'blue', technician: 'green', warehouse: 'amber', support: 'rose', director: 'slate',
+};
+const ROLE_NOTE: Record<string, string> = {
+  admin: 'Full access', sales: 'Enquiries, quotes, orders', technician: 'Surveys and installations',
+  warehouse: 'Stock and dispatch', support: 'Tickets and warranty', director: 'Reports, read-only',
+};
+
 export default function Users() {
   const state = useAsync(() => get('/users/all'));
   const [adding, setAdding] = useState(false);
+  const [role, setRole] = useState('');
   const { run } = useAction();
   return (
     <>
-      <PageHead title="Staff" sub="Roles control what each person can see and do" actions={<button className="btn" onClick={() => setAdding(true)}>+ Add staff</button>} />
-      <Card pad={false}><Async state={state}>{(rows) => <div className="table-wrap"><table>
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th className="num">Hourly rate</th><th>Status</th><th /></tr></thead>
-        <tbody>{rows.map((u) => <tr key={u.id}><td><b>{u.name}</b></td><td>{u.email}</td><td style={{ textTransform: 'capitalize' }}>{label(u.role)}</td><td className="num">{u.role === 'technician' ? money(u.hourly_rate) : '-'}</td>
-          <td><Badge status={u.active ? 'ok' : 'cancelled'}>{u.active ? 'Active' : 'Disabled'}</Badge></td>
-          <td className="right"><button className="btn sm secondary" onClick={async () => { if (await run(() => patch(`/users/${u.id}`, { active: !u.active }), u.active ? 'User disabled' : 'User enabled')) state.reload(); }}>{u.active ? 'Disable' : 'Enable'}</button></td></tr>)}</tbody></table></div>}</Async></Card>
+      <PageHead title="Staff" sub="Roles control what each person can see and do" actions={<button className="btn" onClick={() => setAdding(true)}><Icon n="plus" />Add staff</button>} />
+      <Async state={state}>{(rows: any[]) => {
+        const roles = ROLES.filter((r) => rows.some((u) => u.role === r));
+        const shown = role ? rows.filter((u) => u.role === role) : rows;
+        return (
+          <div className="page-stack">
+            <KpiRow>
+              <Kpi icon="users" tone="indigo" label="Team members" value={rows.length} sub={`${roles.length} roles`} />
+              <Kpi icon="check" tone="green" label="Active" value={rows.filter((u) => u.active).length} sub="can sign in" />
+              <Kpi icon="wrench" tone="amber" label="Technicians" value={rows.filter((u) => u.role === 'technician').length} sub="on the installation crew" />
+              <Kpi icon="shield" tone={rows.some((u) => !u.active) ? 'rose' : 'violet'} label="Disabled" value={rows.filter((u) => !u.active).length} sub="cannot sign in" />
+            </KpiRow>
+            <Chips value={role} onChange={setRole} options={[{ value: '', label: 'Everyone', count: rows.length }, ...roles.map((r) => ({ value: r, label: label(r), count: rows.filter((u) => u.role === r).length }))]} />
+            <Card pad={false}><div className="table-wrap"><table>
+              <thead><tr><th>Member</th><th>Role</th><th className="num">Hourly rate</th><th>Status</th><th /></tr></thead>
+              <tbody>{shown.map((u) => (
+                <tr key={u.id}>
+                  <td><Person name={u.name} sub={u.email} /></td>
+                  <td><Tag tone={ROLE_TONE[u.role] || 'slate'}>{label(u.role)}</Tag><span className="sub-line">{ROLE_NOTE[u.role]}</span></td>
+                  <td className="num">{u.role === 'technician' ? <span className="amt">{money(u.hourly_rate)}</span> : <span className="muted">-</span>}</td>
+                  <td><Badge status={u.active ? 'ok' : 'cancelled'}>{u.active ? 'Active' : 'Disabled'}</Badge></td>
+                  <td className="right"><button className="btn sm secondary" onClick={async () => { if (await run(() => patch(`/users/${u.id}`, { active: !u.active }), u.active ? 'User disabled' : 'User enabled')) state.reload(); }}>{u.active ? 'Disable' : 'Enable'}</button></td>
+                </tr>))}</tbody>
+            </table></div></Card>
+          </div>
+        );
+      }}</Async>
       {adding && <NewUser onClose={() => setAdding(false)} onDone={() => { setAdding(false); state.reload(); }} />}
     </>
   );

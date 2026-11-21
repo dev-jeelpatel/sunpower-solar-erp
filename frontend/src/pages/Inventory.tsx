@@ -3,24 +3,56 @@ import { Link } from 'react-router-dom';
 import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Empty, Field, Modal, PageHead, Pager, Tabs, fmtDate, label, money, useAction, useAsync, useDebounced, useForm, useToast } from '../components/ui';
+import { Chips, Kpi, KpiRow, Meter, Person, Tag } from '../components/kit';
+import { Icon, type IconName } from '../components/icons';
 import { validate, required, positive } from '../validators';
+
+const CAT_ICON: Record<string, IconName> = {
+  panel: 'sun', inverter: 'zap', battery: 'cube', charge_controller: 'zap', wiring_box: 'box', switch: 'zap',
+  earthing: 'shield', stand: 'wrench', cable: 'chart', connector: 'wrench',
+};
 
 function Stock() {
   const state = useAsync(() => get('/inventory/stock'));
   const [cat, setCat] = useState('');
   return (
-    <>
-      <div className="toolbar"><select value={cat} onChange={(e) => setCat(e.target.value)}><option value="">All categories</option>
-        {['panel', 'inverter', 'battery', 'charge_controller', 'wiring_box', 'switch', 'earthing', 'stand', 'cable', 'connector'].map((c) => <option key={c} value={c}>{label(c)}</option>)}</select></div>
-      <Card pad={false}><Async state={state}>{(rows) => (
-        <div className="table-wrap"><table>
-          <thead><tr><th>SKU</th><th>Product</th><th>Category</th><th>Tracking</th><th className="num">On hand</th><th className="num">Committed</th><th className="num">Available</th><th className="num">Reorder at</th><th /></tr></thead>
-          <tbody>{rows.filter((r) => r.category !== 'service' && (!cat || r.category === cat)).map((r) => (
-            <tr key={r.product_id}><td className="mono">{r.sku}</td><td>{r.name}</td><td style={{ textTransform: 'capitalize' }}>{label(r.category)}</td><td>{r.tracked_serial ? <Badge status="info">Serial</Badge> : <span className="muted">Quantity</span>}</td>
-              <td className="num"><b>{r.on_hand}</b></td><td className="num">{r.committed || '-'}</td><td className="num" style={{ color: r.available < 0 ? 'var(--bad)' : undefined }}>{r.available}</td><td className="num">{r.reorder_level}</td>
-              <td>{r.low && <Badge status="low_stock">Reorder</Badge>}</td></tr>))}</tbody>
-        </table></div>)}</Async></Card>
-    </>
+    <Async state={state}>{(all: any[]) => {
+      const rows = all.filter((r) => r.category !== 'service');
+      const cats = [...new Set(rows.map((r) => r.category))] as string[];
+      const shown = rows.filter((r) => !cat || r.category === cat);
+      const low = rows.filter((r) => r.low).length;
+      return (
+        <div className="page-stack">
+          <KpiRow>
+            <Kpi icon="cube" tone="indigo" label="Products" value={rows.length} sub={`${cats.length} categories`} />
+            <Kpi icon="warehouse" tone="blue" label="Units on hand" value={rows.reduce((a, r) => a + Number(r.on_hand), 0).toLocaleString('en-IN')} sub="across all products" />
+            <Kpi icon="truck" tone="amber" label="Committed" value={rows.reduce((a, r) => a + Number(r.committed || 0), 0).toLocaleString('en-IN')} sub="reserved for confirmed orders" />
+            <Kpi icon="alert" tone={low ? 'rose' : 'green'} label="Low stock" value={low} sub={low ? 'at or below reorder level' : 'everything is healthy'} />
+          </KpiRow>
+          <Chips value={cat} onChange={setCat} options={[{ value: '', label: 'All', count: rows.length }, ...cats.map((c) => ({ value: c, label: label(c), count: rows.filter((r) => r.category === c).length }))]} />
+          <Card pad={false}>
+            <div className="table-wrap"><table>
+              <thead><tr><th>Product</th><th>Tracking</th><th style={{ width: 220 }}>On hand</th><th className="num">Committed</th><th className="num">Available</th><th className="num">Reorder at</th><th>Status</th></tr></thead>
+              <tbody>{shown.map((r) => {
+                const onHand = Number(r.on_hand), reorder = Number(r.reorder_level);
+                const tone = r.low ? 'rose' : onHand < reorder * 1.5 ? 'amber' : 'green';
+                return (
+                  <tr key={r.product_id}>
+                    <td><div className="cust"><span className="cat-ic"><Icon n={CAT_ICON[r.category] || 'cube'} /></span><div><b>{r.name}</b><small><span className="mono">{r.sku}</span> · {label(r.category)}</small></div></div></td>
+                    <td>{r.tracked_serial ? <Tag tone="violet">Serial no.</Tag> : <Tag>Quantity</Tag>}</td>
+                    <td><Meter value={onHand} max={Math.max(reorder * 3, onHand, 1)} tone={tone} caption={onHand.toLocaleString('en-IN')} /></td>
+                    <td className="num">{r.committed || <span className="muted">-</span>}</td>
+                    <td className="num"><span className={`amt ${Number(r.available) < 0 ? 'bad' : ''}`}>{r.available}</span></td>
+                    <td className="num">{reorder}</td>
+                    <td>{r.low ? <Tag tone="rose">Reorder now</Tag> : <Tag tone="green">In stock</Tag>}</td>
+                  </tr>
+                );
+              })}</tbody>
+            </table></div>
+          </Card>
+        </div>
+      );
+    }}</Async>
   );
 }
 
@@ -31,16 +63,22 @@ function Serials() {
   const dq = useDebounced(q);
   const state = useAsync(() => get(`/inventory/units?page=${page}&limit=25&q=${encodeURIComponent(dq)}&status=${status}`), [page, dq, status]);
   return (
-    <>
-      <div className="toolbar"><input className="search" placeholder="Search serial number…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All</option>{['in_stock', 'dispatched', 'delivered', 'faulty'].map((s) => <option key={s} value={s}>{label(s)}</option>)}</select></div>
-      <Card pad={false}><Async state={state}>{(d) => d.items.length === 0 ? <Empty>No units.</Empty> : (
+    <div className="page-stack">
+      <Chips value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={[{ value: '', label: 'All' }, ...['in_stock', 'dispatched', 'delivered', 'faulty'].map((s) => ({ value: s, label: label(s) }))]} />
+      <div className="toolbar" style={{ margin: 0 }}><input className="search" placeholder="Search serial number…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} /></div>
+      <Card pad={false}><Async state={state}>{(d) => d.items.length === 0 ? <Empty>No units match.</Empty> : (
         <><div className="table-wrap"><table>
-          <thead><tr><th>Serial</th><th>Product</th><th>Status</th><th>Customer</th><th>Warranty until</th></tr></thead>
-          <tbody>{d.items.map((u) => <tr key={u.id}><td className="mono"><Link to={`/lookup?serial=${u.serial_no}`}>{u.serial_no}</Link></td><td>{u.product_name}</td><td><Badge status={u.status} /></td><td>{u.customer_name || '-'}</td>
-            <td>{u.warranty_end ? <>{fmtDate(u.warranty_end)} <Badge status={u.warranty_state} /></> : '-'}</td></tr>)}</tbody>
+          <thead><tr><th>Serial number</th><th>Product</th><th>Status</th><th>Customer</th><th>Warranty</th></tr></thead>
+          <tbody>{d.items.map((u) => (
+            <tr key={u.id}>
+              <td><Link to={`/lookup?serial=${u.serial_no}`}><Tag tone="slate"><span className="mono">{u.serial_no}</span></Tag></Link></td>
+              <td><b>{u.product_name}</b></td>
+              <td><Badge status={u.status} /></td>
+              <td>{u.customer_name ? <Person name={u.customer_name} /> : <span className="muted">Not assigned</span>}</td>
+              <td>{u.warranty_end ? <><b className="soft">{fmtDate(u.warranty_end)}</b> <Badge status={u.warranty_state} /></> : <span className="muted">Starts on delivery</span>}</td>
+            </tr>))}</tbody>
         </table></div><Pager page={d.page} limit={d.limit} total={d.total} onPage={setPage} /></>)}</Async></Card>
-    </>
+    </div>
   );
 }
 

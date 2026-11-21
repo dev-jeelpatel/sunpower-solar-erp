@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { get } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Empty, PageHead, Pager, fmtDate, fmtDateTime, label, money, useAsync } from '../components/ui';
+import { Chips, Kpi, KpiRow, Meter, Person, Tag } from '../components/kit';
+import { Icon } from '../components/icons';
 import { PaymentModal } from './OrderDetail';
 
 export default function Invoices() {
@@ -11,23 +13,55 @@ export default function Invoices() {
   const [kind, setKind] = useState('');
   const [page, setPage] = useState(1);
   const state = useAsync(() => get(`/invoices?page=${page}&status=${status}&kind=${kind}`), [page, status, kind]);
+  const all = useAsync(() => get('/invoices?limit=100'), []);
+  const items: any[] = all.data?.items || [];
+  const live = items.filter((i) => i.status !== 'void');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const overdue = live.filter((i) => i.status !== 'paid' && String(i.due_date) < todayStr);
+  const cnt = (s: string) => items.filter((i) => i.status === s).length;
+  const invoiced = live.reduce((a, i) => a + Number(i.total), 0);
+  const collected = live.reduce((a, i) => a + Number(i.paid), 0);
   return (
     <>
       <PageHead title="Invoices & payments" sub="Order invoices and after-sales service bills" />
-      <div className="toolbar">
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option>{['sent', 'partially_paid', 'paid', 'void'].map((s) => <option key={s} value={s}>{label(s)}</option>)}</select>
-        <select value={kind} onChange={(e) => { setKind(e.target.value); setPage(1); }}><option value="">All types</option><option value="order">Order</option><option value="service">Service</option></select>
+      <div className="page-stack">
+        <KpiRow>
+          <Kpi icon="doc" tone="indigo" label="Invoiced" value={money(invoiced)} sub={`${live.length} invoices`} />
+          <Kpi icon="wallet" tone="green" label="Collected" value={money(collected)} sub={invoiced ? `${Math.round((collected / invoiced) * 100)}% of invoiced` : ''} />
+          <Kpi icon="clock" tone="amber" label="Outstanding" value={money(invoiced - collected)} sub={`${cnt('sent') + cnt('partially_paid')} invoices open`} />
+          <Kpi icon="alert" tone="rose" label="Overdue" value={overdue.length} sub={overdue.length ? `${money(overdue.reduce((a, i) => a + Number(i.total) - Number(i.paid), 0))} past due` : 'nothing overdue'} />
+        </KpiRow>
+        <div className="row between" style={{ gap: 12 }}>
+          <Chips value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={[
+            { value: '', label: 'All', count: items.length },
+            ...['sent', 'partially_paid', 'paid', 'void'].map((s) => ({ value: s, label: label(s), count: cnt(s) })),
+          ]} />
+          <div className="viewtog" role="group" aria-label="Invoice type">
+            {[['', 'All types'], ['order', 'Orders'], ['service', 'Service']].map(([k, l]) => <button key={k} className={kind === k ? 'on' : ''} onClick={() => { setKind(k); setPage(1); }}>{l}</button>)}
+          </div>
+        </div>
+        <Card pad={false}>
+          <Async state={state}>{(d) => d.items.length === 0 ? <Empty>No invoices match.</Empty> : (
+            <><div className="table-wrap"><table>
+              <thead><tr><th>Invoice</th><th>Customer</th><th>Issued</th><th>Due</th><th className="num">Total</th><th style={{ width: 190 }}>Paid</th><th>Status</th><th /></tr></thead>
+              <tbody>{d.items.map((i) => {
+                const late = i.status !== 'paid' && i.status !== 'void' && String(i.due_date) < todayStr;
+                return (
+                  <tr key={i.id} className="clickable" onClick={() => nav(`/invoices/${i.id}`)}>
+                    <td className="nowrap"><b>{i.invoice_no}</b><span className="sub-line"><Tag tone={i.kind === 'service' ? 'violet' : 'blue'}>{i.kind === 'service' ? 'Service' : 'Order'}</Tag></span></td>
+                    <td><Person name={i.customer_name} /></td>
+                    <td className="nowrap">{fmtDate(i.issued_at)}</td>
+                    <td className="nowrap">{fmtDate(i.due_date)}{late && <span className="sub-line" style={{ color: 'var(--bad)', fontWeight: 600 }}>Overdue</span>}</td>
+                    <td className="num"><span className="amt">{money(i.total)}</span></td>
+                    <td><Meter value={Number(i.paid)} max={Number(i.total)} tone={Number(i.paid) >= Number(i.total) ? 'green' : late ? 'rose' : 'indigo'} caption={money(i.paid)} /></td>
+                    <td><Badge status={i.status} /></td>
+                    <td className="row-go"><Icon n="arrow" /></td>
+                  </tr>
+                );
+              })}</tbody>
+            </table></div><Pager page={d.page} limit={d.limit} total={d.total} onPage={setPage} /></>)}</Async>
+        </Card>
       </div>
-      <Card pad={false}>
-        <Async state={state}>{(d) => d.items.length === 0 ? <Empty>No invoices.</Empty> : (
-          <><div className="table-wrap"><table>
-            <thead><tr><th>Invoice</th><th>Customer</th><th>Type</th><th>Issued</th><th>Due</th><th className="num">Total</th><th className="num">Paid</th><th>Status</th></tr></thead>
-            <tbody>{d.items.map((i) => <tr key={i.id} className="clickable" onClick={() => nav(`/invoices/${i.id}`)}>
-              <td><b>{i.invoice_no}</b></td><td>{i.customer_name}</td><td style={{ textTransform: 'capitalize' }}>{i.kind}</td><td>{fmtDate(i.issued_at)}</td>
-              <td style={{ color: i.status !== 'paid' && i.status !== 'void' && i.due_date < new Date().toISOString().slice(0, 10) ? 'var(--bad)' : undefined }}>{fmtDate(i.due_date)}</td>
-              <td className="num">{money(i.total)}</td><td className="num">{money(i.paid)}</td><td><Badge status={i.status} /></td></tr>)}</tbody>
-          </table></div><Pager page={d.page} limit={d.limit} total={d.total} onPage={setPage} /></>)}</Async>
-      </Card>
     </>
   );
 }

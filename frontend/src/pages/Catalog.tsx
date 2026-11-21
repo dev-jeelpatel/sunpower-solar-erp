@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Field, Modal, PageHead, Tabs, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { Chips, Kpi, KpiRow, Meter, Tag } from '../components/kit';
+import { Icon, type IconName } from '../components/icons';
 import { validate, required, minLen } from '../validators';
 
 const CATS = ['panel', 'inverter', 'battery', 'charge_controller', 'wiring_box', 'switch', 'earthing', 'stand', 'cable', 'connector', 'service'];
@@ -38,28 +40,77 @@ function ProductForm({ p, onClose, onDone }) {
 export default function Catalog() {
   const user = useCurrentUser();
   const [tab, setTab] = useState('packages');
+  const [kind, setKind] = useState('');
   const prods = useAsync(() => get('/catalog/products'));
   const pkgs = useAsync(() => get('/catalog/packages'));
   const [edit, setEdit] = useState<any>(null);
   const [open, setOpen] = useState<any>(null);
   return (
     <>
-      <PageHead title="Products & packages" sub="Package templates define the exact parts for every quote" actions={tab === 'products' && can(user, 'warehouse') && <button className="btn" onClick={() => setEdit({})}>+ New product</button>} />
+      <PageHead title="Products & packages" sub="Package templates define the exact parts for every quote" actions={tab === 'products' && can(user, 'warehouse') && <button className="btn" onClick={() => setEdit({})}><Icon n="plus" />New product</button>} />
       <Tabs value={tab} onChange={setTab} tabs={[['packages', 'Packages (bill of materials)'], ['products', 'Products']]} />
-      {tab === 'packages' && <Async state={pkgs}>{(rows) => (
-        <div className="grid g3">{rows.map((p) => (
-          <Card key={p.id} title={p.name} actions={<Badge status={p.kind === 'off_grid' ? 'warn' : 'info'}>{label(p.kind)}</Badge>}>
-            <p className="muted small" style={{ marginTop: 0 }}>{p.description}</p>
-            <div className="row between"><b style={{ fontSize: '1.2rem' }}>{money(p.list_price)}</b><button className="btn sm secondary" onClick={() => setOpen(open === p.id ? null : p.id)}>{p.items.length} parts {open === p.id ? '▲' : '▼'}</button></div>
-            {open === p.id && <table style={{ marginTop: 10 }}><tbody>{p.items.map((i) => <tr key={i.productId}><td style={{ padding: '5px 0' }} className="small">{i.name}</td><td className="num small" style={{ padding: '5px 0' }}>×{i.quantity}</td></tr>)}</tbody></table>}
-          </Card>))}</div>)}</Async>}
-      {tab === 'products' && <Card pad={false}><Async state={prods}>{(rows) => (
-        <div className="table-wrap"><table>
-          <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th className="num">Cost</th><th className="num">Price</th><th className="num">Margin</th><th>Serial</th><th /></tr></thead>
-          <tbody>{rows.map((r) => <tr key={r.product_id}><td className="mono">{r.sku}</td><td>{r.name}</td><td style={{ textTransform: 'capitalize' }}>{label(r.category)}</td><td className="num">{money(r.cost_price)}</td><td className="num">{money(r.sell_price)}</td>
-            <td className="num">{r.sell_price ? Math.round(((r.sell_price - r.cost_price) / r.sell_price) * 100) : 0}%</td><td>{r.tracked_serial ? '✓' : ''}</td>
-            <td className="right">{can(user, 'warehouse') && <button className="btn sm secondary" onClick={() => setEdit(r)}>Edit</button>}</td></tr>)}</tbody>
-        </table></div>)}</Async></Card>}
+
+      {tab === 'packages' && <Async state={pkgs}>{(rows: any[]) => {
+        const shown = rows.filter((p) => !kind || p.kind === kind);
+        const kinds = [...new Set(rows.map((p) => p.kind))] as string[];
+        return (
+          <div className="page-stack">
+            <KpiRow>
+              <Kpi icon="sun" tone="indigo" label="Packages" value={rows.length} sub="ready to quote" />
+              <Kpi icon="zap" tone="blue" label="On-grid" value={rows.filter((p) => p.kind === 'on_grid').length} sub="grid-connected systems" />
+              <Kpi icon="cube" tone="amber" label="Off-grid" value={rows.filter((p) => p.kind === 'off_grid').length} sub="with battery backup" />
+              <Kpi icon="wallet" tone="green" label="Price range" value={rows.length ? `${money(Math.min(...rows.map((p) => Number(p.list_price))))}+` : '-'} sub="list price, before GST" />
+            </KpiRow>
+            <Chips value={kind} onChange={setKind} options={[{ value: '', label: 'All', count: rows.length }, ...kinds.map((k) => ({ value: k, label: label(k), count: rows.filter((p) => p.kind === k).length }))]} />
+            <div className="pcards">{shown.map((p) => (
+              <article key={p.id} className="pcard">
+                <div className="pcard-top">
+                  <div className="pcard-kw">{p.capacity_kw ? <>{p.capacity_kw}<small>kW</small></> : <small style={{ marginLeft: 0 }}>Add-on</small>}</div>
+                  <Tag tone={p.kind === 'off_grid' ? 'amber' : p.kind === 'on_grid' ? 'blue' : 'slate'}>{label(p.kind)}</Tag>
+                </div>
+                <h3>{p.name}</h3>
+                <div className="pcard-price">{money(p.list_price)}<span className="muted small" style={{ fontWeight: 500 }}> before GST</span></div>
+                <p>{p.description}</p>
+                <button className="btn sm secondary" onClick={() => setOpen(open === p.id ? null : p.id)}>{open === p.id ? 'Hide' : 'Show'} {p.items.length} parts</button>
+                {open === p.id && <ul className="bom">{p.items.map((i) => <li key={i.productId}><b className="soft" style={{ fontWeight: 550 }}>{i.name}</b><span>×{i.quantity}</span></li>)}</ul>}
+              </article>))}</div>
+          </div>
+        );
+      }}</Async>}
+
+      {tab === 'products' && <Async state={prods}>{(rows: any[]) => {
+        const real = rows.filter((r) => Number(r.sell_price) > 0);
+        const avg = real.length ? Math.round(real.reduce((a, r) => a + ((r.sell_price - r.cost_price) / r.sell_price) * 100, 0) / real.length) : 0;
+        return (
+          <div className="page-stack">
+            <KpiRow>
+              <Kpi icon="cube" tone="indigo" label="Products" value={rows.length} sub={`${new Set(rows.map((r) => r.category)).size} categories`} />
+              <Kpi icon="search" tone="violet" label="Serial-tracked" value={rows.filter((r) => r.tracked_serial).length} sub="each unit has a serial no." />
+              <Kpi icon="trend" tone="green" label="Average margin" value={`${avg}%`} sub="selling price over cost" />
+              <Kpi icon="alert" tone="amber" label="Low margin" value={real.filter((r) => ((r.sell_price - r.cost_price) / r.sell_price) * 100 < 15).length} sub="products under 15%" />
+            </KpiRow>
+            <Card pad={false}>
+              <div className="table-wrap"><table>
+                <thead><tr><th>Product</th><th>Category</th><th className="num">Cost</th><th className="num">Price</th><th style={{ width: 170 }}>Margin</th><th>Tracking</th><th /></tr></thead>
+                <tbody>{rows.map((r) => {
+                  const m = r.sell_price ? Math.round(((r.sell_price - r.cost_price) / r.sell_price) * 100) : 0;
+                  return (
+                    <tr key={r.product_id}>
+                      <td><b>{r.name}</b><span className="sub-line"><span className="mono">{r.sku}</span></span></td>
+                      <td><Tag tone="slate">{label(r.category)}</Tag></td>
+                      <td className="num">{money(r.cost_price)}</td>
+                      <td className="num"><span className="amt">{money(r.sell_price)}</span></td>
+                      <td><Meter value={m} max={50} tone={m < 15 ? 'amber' : 'green'} caption={`${m}%`} /></td>
+                      <td>{r.tracked_serial ? <Tag tone="violet">Serial no.</Tag> : <Tag>Quantity</Tag>}</td>
+                      <td className="right">{can(user, 'warehouse') && <button className="btn sm secondary" onClick={() => setEdit(r)}>Edit</button>}</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table></div>
+            </Card>
+          </div>
+        );
+      }}</Async>}
       {edit && <ProductForm p={edit.sku ? edit : null} onClose={() => setEdit(null)} onDone={() => { setEdit(null); prods.reload(); pkgs.reload(); }} />}
     </>
   );

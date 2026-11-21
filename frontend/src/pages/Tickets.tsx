@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Empty, Field, Modal, PageHead, Pager, fmtDate, label, useAction, useAsync, useDebounced, useForm } from '../components/ui';
+import { Avatar, Chips, Kpi, KpiRow, Person, Tag, ago } from '../components/kit';
+import { Icon, type IconName } from '../components/icons';
 import { validate, required, minLen } from '../validators';
 
 function NewTicket({ onClose, initialSerial = '' }) {
@@ -43,6 +45,8 @@ function NewTicket({ onClose, initialSerial = '' }) {
   );
 }
 
+const PRIORITY_TONE: Record<string, 'rose' | 'amber' | 'blue' | 'slate'> = { urgent: 'rose', high: 'amber', normal: 'blue', low: 'slate' };
+
 export default function Tickets() {
   const user = useCurrentUser();
   const nav = useNavigate();
@@ -52,21 +56,47 @@ export default function Tickets() {
   const [adding, setAdding] = useState(false);
   const dq = useDebounced(q);
   const state = useAsync(() => get(`/tickets?page=${page}&status=${status}&q=${encodeURIComponent(dq)}`), [page, status, dq]);
+  // Summary and chip counts come from the latest 100 tickets
+  const all = useAsync(() => get('/tickets?limit=100&status='), []);
+  const items: any[] = all.data?.items || [];
+  const cnt = (s: string) => items.filter((t) => t.status === s).length;
+  const active = items.filter((t) => t.status !== 'closed');
+  const hot = active.filter((t) => ['urgent', 'high'].includes(t.priority) && ['open', 'assigned'].includes(t.status)).length;
   return (
     <>
-      <PageHead title="Service tickets" sub="Every complaint is tracked until the customer confirms it works" actions={can(user, 'support') && <button className="btn" onClick={() => setAdding(true)}>+ New ticket</button>} />
-      <div className="toolbar">
-        <input className="search" placeholder="Search ticket, customer, phone or serial…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="active">Not closed</option><option value="">All</option>{['open', 'assigned', 'resolved', 'closed'].map((s) => <option key={s} value={s}>{label(s)}</option>)}</select>
+      <PageHead title="Service tickets" sub="Every complaint is tracked until the customer confirms it works" actions={can(user, 'support') && <button className="btn" onClick={() => setAdding(true)}><Icon n="plus" />New ticket</button>} />
+      <div className="page-stack">
+        <KpiRow>
+          <Kpi icon="ticket" tone="indigo" label="Open" value={cnt('open')} sub="not assigned yet" />
+          <Kpi icon="wrench" tone="blue" label="Being handled" value={cnt('assigned')} sub="assigned to someone" />
+          <Kpi icon="alert" tone={hot ? 'rose' : 'green'} label="High priority" value={hot} sub={hot ? 'open or assigned, needs care' : 'nothing urgent'} />
+          <Kpi icon="check" tone="green" label="Awaiting confirmation" value={cnt('resolved')} sub="fixed, customer to confirm" />
+        </KpiRow>
+        <Chips value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={[
+          { value: 'active', label: 'Not closed', count: active.length },
+          ...['open', 'assigned', 'resolved', 'closed'].map((s) => ({ value: s, label: label(s), count: cnt(s) })),
+          { value: '', label: 'All', count: items.length },
+        ]} />
+        <div className="toolbar" style={{ margin: 0 }}>
+          <input className="search" placeholder="Search ticket, customer, phone or serial…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+        </div>
+        <Card pad={false}><Async state={state}>{(d) => d.items.length === 0 ? <Empty>No tickets here. Nice work!</Empty> : (
+          <><div className="table-wrap"><table>
+            <thead><tr><th>Ticket</th><th>Customer</th><th>Issue</th><th>Priority</th><th>Warranty</th><th>Assigned</th><th>Status</th><th /></tr></thead>
+            <tbody>{d.items.map((t) => (
+              <tr key={t.id} className="clickable" onClick={() => nav(`/tickets/${t.id}`)}>
+                <td><b>{t.ticket_no}</b><span className="sub-line">{ago(t.created_at)}</span></td>
+                <td><Person name={t.customer_name} /></td>
+                <td style={{ maxWidth: 260 }}><b className="soft">{t.subject}</b>{t.serial_no && <span className="sub-line"><span className="mono">{t.serial_no}</span></span>}</td>
+                <td><Tag tone={PRIORITY_TONE[t.priority] || 'slate'}>{label(t.priority)}</Tag></td>
+                <td>{t.warranty_status === 'in_warranty' ? <Tag tone="green">In warranty · free</Tag> : t.warranty_status === 'out_of_warranty' ? <Tag tone="rose">Out of warranty · billable</Tag> : <Tag>Unknown</Tag>}</td>
+                <td>{t.assigned_name ? <span className="who"><Avatar name={t.assigned_name} mini />{t.assigned_name}</span> : <span className="muted">Unassigned</span>}</td>
+                <td><Badge status={t.status} /></td>
+                <td className="row-go"><Icon n="arrow" /></td>
+              </tr>))}</tbody>
+          </table></div><Pager page={d.page} limit={d.limit} total={d.total} onPage={setPage} /></>)}</Async></Card>
       </div>
-      <Card pad={false}><Async state={state}>{(d) => d.items.length === 0 ? <Empty>No tickets 🎉</Empty> : (
-        <><div className="table-wrap"><table>
-          <thead><tr><th>Ticket</th><th>Customer</th><th>Issue</th><th>Serial</th><th>Priority</th><th>Warranty</th><th>Assigned</th><th>Opened</th><th>Status</th></tr></thead>
-          <tbody>{d.items.map((t) => <tr key={t.id} className="clickable" onClick={() => nav(`/tickets/${t.id}`)}>
-            <td><b>{t.ticket_no}</b></td><td>{t.customer_name}</td><td>{t.subject}</td><td className="mono small">{t.serial_no || '-'}</td><td><Badge status={t.priority} /></td><td><Badge status={t.warranty_status} /></td>
-            <td>{t.assigned_name || '-'}</td><td>{fmtDate(t.created_at)}</td><td><Badge status={t.status} /></td></tr>)}</tbody>
-        </table></div><Pager page={d.page} limit={d.limit} total={d.total} onPage={setPage} /></>)}</Async></Card>
-      {adding && <NewTicket onClose={() => { setAdding(false); state.reload(); }} />}
+      {adding && <NewTicket onClose={() => { setAdding(false); state.reload(); all.reload(); }} />}
     </>
   );
 }
