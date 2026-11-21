@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, del, get, photoUrl, post } from '../api';
-import { useCurrentUser } from '../auth';
+import { useCurrentUser, can } from '../auth';
+import ScheduleTech from '../components/ScheduleTech';
 import SignaturePad from '../components/SignaturePad';
 import { Async, Badge, Card, Field, PageHead, fmtDate, fmtDateTime, money, toLocalInput, useAction, useAsync, useForm, useToast } from '../components/ui';
 import { validate, required, range, minLen } from '../validators';
@@ -87,6 +88,8 @@ export default function JobDetail() {
   const { id } = useParams();
   const user = useCurrentUser();
   const state = useAsync(() => get(`/jobs/${id}`), [id]);
+  const canAssign = can(user, 'sales');
+  const [assign, setAssign] = useState(false);
   return (
     <Async state={state}>{(j) => (
       <>
@@ -109,13 +112,14 @@ export default function JobDetail() {
           <div className="stack">
             <Card title="Job details"><dl className="kv" style={{ gridTemplateColumns: '90px 1fr' }}>
               <dt>Site</dt><dd>{j.address}{j.city ? `, ${j.city}` : ''}</dd><dt>Phone</dt><dd><a href={`tel:${j.phone}`}>{j.phone}</a></dd>
-              <dt>Date</dt><dd>{fmtDate(j.scheduled_date)}</dd><dt>Crew</dt><dd>{j.crew.map((c) => c.name).join(', ') || '-'}</dd>
+              <dt>Date</dt><dd>{fmtDate(j.scheduled_date)}</dd><dt>Technician</dt><dd>{j.crew.map((c) => c.name).join(', ') || <span style={{ color: j.dispatch_status === 'delivered' ? 'var(--bad)' : undefined }}>{j.dispatch_status === 'delivered' ? 'Not assigned yet' : 'Assigned after delivery'}</span>} {canAssign && j.status !== 'completed' && j.dispatch_status === 'delivered' && <button className="btn sm secondary" style={{ marginLeft: 8 }} onClick={() => setAssign(true)}>{j.crew.length ? 'Change' : 'Assign'}</button>}</dd>
               <dt>Order</dt><dd><Link to={`/orders/${j.order_id}`}>{j.order_no}</Link></dd></dl></Card>
             <Card title="Equipment installed (serial numbers)" pad={false}>
               {j.units.length === 0 ? <div className="empty">Not dispatched yet</div> : <div className="table-wrap"><table><tbody>{j.units.map((u) => <tr key={u.serial_no}><td className="small">{u.name}</td><td className="mono small">{u.serial_no}</td></tr>)}</tbody></table></div>}
             </Card>
           </div>
         </div>
+        {assign && <ScheduleTech orderId={j.order_id} job={{ id: j.id, crew: j.crew.map((c) => c.name), scheduled_date: j.scheduled_date }} onClose={() => setAssign(false)} onDone={() => { setAssign(false); state.reload(); }} />}
       </>
     )}</Async>
   );

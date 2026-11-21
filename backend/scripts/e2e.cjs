@@ -97,7 +97,9 @@ async function login(name) {
   o = await ok('confirmed order', call('GET', `/orders/${order.id}`, { token: tokens.sales }));
   assert.equal(o.status, 'confirmed');
   assert.ok(o.dispatch, 'warehouse dispatch created');
-  assert.equal(o.job.status, 'scheduled', 'job auto-scheduled');
+  assert.equal(o.job.status, 'unscheduled', 'job opened, no technician yet');
+  assert.equal((o.job.crew || []).length, 0, 'no technician is chosen automatically');
+  await fails('cannot assign a technician before delivery', call('POST', `/orders/${order.id}/schedule`, { token: tokens.sales, body: { technicianIds: [tech1.id], scheduledDate: '2099-01-02' } }), 422, 'after the materials are delivered');
 
   const disp = await ok('warehouse sees pick list', call('GET', `/dispatches/${o.dispatch.id}`, { token: tokens.warehouse }));
   await fails('cannot dispatch before scanning', call('POST', `/dispatches/${disp.id}/dispatch`, { token: tokens.warehouse, body: { vehicleNo: 'GJ05AB1234' } }), 422, 'Scan every serial');
@@ -123,11 +125,10 @@ async function login(name) {
 
   console.log('Installation sign-off');
   const jobs = await ok('technician sees own jobs', call('GET', '/jobs', { token: tokens.tech1 }));
-  let job = jobs.find((j) => j.order_no === o.order_no);
-  if (!job) { // auto-assign may have chosen another technician: reassign to tech1
-    await ok('reassign crew', call('POST', `/orders/${order.id}/schedule`, { token: tokens.sales, body: { technicianIds: [tech1.id], scheduledDate: tomorrow } }));
-    job = (await ok('jobs again', call('GET', '/jobs', { token: tokens.tech1 }))).find((j) => j.order_no === o.order_no);
-  }
+  assert.ok(!jobs.find((j) => j.order_no === o.order_no), 'technician sees nothing until assigned');
+  await ok('sales assigns the technician after delivery', call('POST', `/orders/${order.id}/schedule`, { token: tokens.sales, body: { technicianIds: [tech1.id], scheduledDate: tomorrow } }));
+  const job = (await ok('jobs again', call('GET', '/jobs', { token: tokens.tech1 }))).find((j) => j.order_no === o.order_no);
+  assert.ok(job, 'technician now sees the job');
   const now = new Date();
   const body = { startedAt: new Date(now - 6 * 3600e3).toISOString(), finishedAt: new Date(now - 60e3).toISOString(), confirmedKw: 3, signerName: 'E2E Customer', signature: PNG };
   await fails('completion needs a photo', call('POST', `/jobs/${job.id}/complete`, { token: tokens.tech1, body }), 422, 'photo');

@@ -1,3 +1,4 @@
+import ScheduleTech from '../components/ScheduleTech';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { get, post } from '../api';
@@ -41,31 +42,13 @@ function stageTime(o: any, stage: string): string | null {
   }
 }
 
-function Schedule({ o, onClose, onDone }) {
-  const techs = useAsync(() => get('/users?role=technician'));
-  const f = useForm({ techs: [] as number[], date: o.job?.scheduled_date || new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10) });
-  const { run, busy } = useAction(f.setErrors);
-  const toggle = (id) => f.set('techs', f.values.techs.includes(id) ? f.values.techs.filter((x) => x !== id) : [...f.values.techs, id]);
-  const submit = async () => {
-    if (!f.values.techs.length) return f.setErrors({ technicianIds: 'Choose at least one technician' });
-    if (await run(() => post(`/orders/${o.id}/schedule`, { technicianIds: f.values.techs, scheduledDate: f.values.date }), 'Crew scheduled')) onDone();
-  };
-  return (
-    <Modal title="Assign installation crew" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save schedule</button></>}>
-      <div className="stack">
-        <Field label="Installation date" error={f.errors.scheduledDate}><input type="date" {...f.bind('date')} /></Field>
-        <Field label="Crew" error={f.errors.technicianIds}>{(techs.data || []).map((t) => <label key={t.id} className="check"><input type="checkbox" checked={f.values.techs.includes(t.id)} onChange={() => toggle(t.id)} /> {t.name}</label>)}</Field>
-      </div>
-    </Modal>
-  );
-}
 
 const STAGES = [['pending_payment', 'Order placed'], ['confirmed', 'Advance received'], ['dispatched', 'Dispatched'], ['delivered', 'Delivered'], ['completed', 'Installed & signed off']];
 const STAGE_NEXT: Record<string, string> = {
   pending_payment: 'Record the advance payment to confirm the order. The warehouse and crew are then notified automatically.',
   confirmed: 'The warehouse packs the order and scans every serial number before the truck leaves.',
   dispatched: 'The shipment is on its way. Mark it delivered when it reaches the customer.',
-  delivered: 'The crew installs the system, uploads photos and gets the customer sign-off.',
+  delivered: 'Materials are at the customer. Assign a technician for the installation; they install, upload photos and get the customer sign-off.',
   completed: 'Installed and signed off. The warranty is now running.',
 };
 
@@ -88,13 +71,16 @@ export default function OrderDetail() {
           <PageHead crumb={<div className="crumb"><Link to="/orders">← Orders</Link></div>} title={o.order_no} sub={<>{o.customer_name} · {o.package_name} · <Badge status={o.status} /></>}
             actions={sales && <>
               {o.invoice && remaining > 0 && o.status !== 'cancelled' && <button className="btn" onClick={() => setModal('pay')}>Record payment</button>}
-              {o.job && o.job.status !== 'completed' && <button className="btn secondary" onClick={() => setModal('schedule')}>Assign crew</button>}
+              {o.job && o.job.status !== 'completed' && o.dispatch?.status === 'delivered' && <button className={`btn ${(o.job.crew || []).length ? 'secondary' : ''}`} onClick={() => setModal('schedule')}>{(o.job.crew || []).length ? 'Change technician' : 'Assign technician'}</button>}
               {['pending_payment', 'confirmed'].includes(o.status) && paid === 0 && <button className="btn secondary" onClick={() => setModal('cancel')}>Cancel order</button>}
             </>} />
           {o.status === 'cancelled' ? <div className="alert bad" style={{ marginBottom: 16 }}>This order was cancelled.</div>
             : <Tracker
                 steps={STAGES.map(([k, l]) => ({ key: k, label: l, at: stageTime(o, k) }))}
                 current={idx} finished={o.status === 'completed'} next={STAGE_NEXT[o.status]} />}
+          {o.dispatch?.status === 'delivered' && o.job && o.job.status !== 'completed' && !(o.job.crew || []).length && (
+            <div className="alert warn" style={{ marginBottom: 16 }}><b>Delivered. Next step:</b> assign a technician to install it. <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => setModal('schedule')}>Assign technician</button></div>
+          )}
           {o.status === 'pending_payment' && <div className="alert warn" style={{ marginBottom: 16 }}>The order is confirmed (warehouse + crew notified automatically) once <b>{money(o.advanceRequired)}</b> is received. Received so far: {money(paid)}.</div>}
 
           <div className="grid split">
@@ -119,12 +105,12 @@ export default function OrderDetail() {
                 <dt>Quote</dt><dd><Link to={`/quotes/${o.quote_id}`}>{o.quote_no}</Link></dd></dl></Card>
               <Card title="Fulfilment"><dl className="kv" style={{ gridTemplateColumns: '110px 1fr' }}>
                 <dt>Warehouse</dt><dd>{o.dispatch ? <><Link to={`/dispatch/${o.dispatch.id}`}>Dispatch</Link> <Badge status={o.dispatch.status} /></> : 'Starts after advance'}</dd>
-                <dt>Installation</dt><dd>{o.job ? <><Link to={`/jobs/${o.job.id}`}>Job</Link> <Badge status={o.job.status} /><div className="muted small">{fmtDate(o.job.scheduled_date)} · {(o.job.crew || []).join(', ') || 'No crew'}</div></> : 'Starts after advance'}</dd>
+                <dt>Installation</dt><dd>{o.job ? <><Link to={`/jobs/${o.job.id}`}>Job</Link> <Badge status={o.job.status} /><div className="muted small">{fmtDate(o.job.scheduled_date)} · {(o.job.crew || []).join(', ') || (o.dispatch?.status === 'delivered' ? 'Needs a technician' : 'Technician is assigned after delivery')}</div></> : 'Starts after advance'}</dd>
                 <dt>Subsidy</dt><dd>{o.subsidy ? <><Link to="/subsidies">{o.subsidy.status.replace('_', ' ')}</Link><div className="muted small">Expected {money(o.subsidy.expected_amount)}</div></> : 'Not applicable'}</dd></dl></Card>
             </div>
           </div>
           {modal === 'pay' && <PaymentModal invoice={o.invoice} remaining={remaining} onClose={() => setModal(null)} onDone={done} />}
-          {modal === 'schedule' && <Schedule o={o} onClose={() => setModal(null)} onDone={done} />}
+          {modal === 'schedule' && <ScheduleTech orderId={o.id} job={o.job} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'cancel' && <Confirm danger title="Cancel this order?" message="The invoice will be voided. This cannot be undone." yesLabel="Cancel order" onNo={() => setModal(null)}
             onYes={async () => { setModal(null); if (await run(() => post(`/orders/${id}/cancel`), 'Order cancelled')) state.reload(); }} />}
         </>

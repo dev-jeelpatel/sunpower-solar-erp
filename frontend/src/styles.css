@@ -940,3 +940,30 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .contact-line a:hover { background: #dfe3fb; text-decoration: none; }
 .contact-line svg { width: 13px; height: 13px; }
 .contact-line a.addr-chip { white-space: normal; border-radius: 12px; line-height: 1.35; padding: 4px 10px; }
+
+/* create-quote steps */
+.qm-step { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: #fafbfe; }
+.qm-step > b { display: flex; gap: 10px; align-items: center; }
+.qm-step > b i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: .75rem; font-weight: 800; flex: none; }
+.qm-line { min-width: 90px; text-align: right; font-weight: 650; padding-bottom: 10px; }
+.qm-total { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-content: start; } .qm-total dt { color: var(--muted); } .qm-total dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.tech-pick { display: grid; gap: 8px; }
+.tech-opt { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; background: #fff; }
+.tech-opt.on { border-color: var(--primary); background: var(--primary-soft); }
+.tech-opt em { margin-left: auto; font-style: normal; font-size: .75rem; color: var(--muted); }
+
+/* technician availability */
+.tech-avail { display: grid; gap: 10px; }
+.ta-sum { padding: 9px 12px; border-radius: 10px; font-size: .88rem; font-weight: 600; }
+.ta-sum.ok { background: #ecfdf5; color: #047857; } .ta-sum.bad { background: #fef2f2; color: #b91c1c; }
+.tech-opt.off { opacity: .8; background: #f8fafc; cursor: not-allowed; }
+.ta-name { display: grid; gap: 2px; } .ta-name small { color: var(--muted); font-size: .78rem; } .ta-name em { margin-left: 8px; font-style: normal; font-size: .72rem; color: var(--muted); font-weight: 500; }
+.ta-badge { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 3px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+.ta-badge.ok { background: #d1fae5; color: #065f46; } .ta-badge.bad { background: #fee2e2; color: #991b1b; }
+.ta-link { background: none; border: 0; padding: 0; color: var(--primary-dark); font-weight: 700; text-decoration: underline; cursor: pointer; font-size: inherit; }
+.ta-badge .ta-link { color: #991b1b; }
+
+.tech-opt input[type=radio] { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: none; accent-color: var(--primary); }
+.ta-name { flex: 1; min-width: 0; }
+.no-tech { color: var(--bad); font-weight: 650; }
+.crew-btn { margin-left: auto; }

@@ -1,3 +1,4 @@
+import { notify } from '../../realtime/socket';
 import { notFound, unprocessable } from '../../lib/errors';
 import { type Db, logActivity, prisma, q, tx } from '../../lib/prisma';
 import { dispatchRepository as repo } from './dispatch.repository';
@@ -49,7 +50,7 @@ export const dispatchService = {
 
   /** Demo helper for sites without a barcode scanner: scan the oldest in-stock serial for every missing unit. */
   async autofill(id: number, userId: number) {
-    const info = await this.get(id);
+    const info: Record<string, any> = await this.get(id);
     for (const l of info.items) for (const serial of l.suggested) await this.scan(id, serial, userId);
     return this.get(id);
   },
@@ -95,6 +96,8 @@ export const dispatchService = {
       await repo.setOrderStatus(db, d.order_id, 'delivered');
       await logActivity(db, 'order', d.order_id, 'delivered', userId);
     });
-    return this.get(id);
+    const info: Record<string, any> = await this.get(id);
+    notify(['sales'], 'dispatch:delivered', { title: `${info.order_no} delivered to ${info.customer_name}: assign a technician for the installation`, link: `/orders/${info.order_id}` });
+    return info;
   },
 };

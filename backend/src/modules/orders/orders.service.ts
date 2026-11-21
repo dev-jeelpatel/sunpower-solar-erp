@@ -1,7 +1,9 @@
+import { notifyUsers } from '../../realtime/socket';
+import { availabilityService } from '../availability/availability.service';
 import { env } from '../../config/env';
 import { notFound, unprocessable } from '../../lib/errors';
 import { type Db, logActivity, tx } from '../../lib/prisma';
-import { today, workingDayFromNow } from '../../lib/utils';
+import { today } from '../../lib/utils';
 import { ordersRepository as repo } from './orders.repository';
 import type { ScheduleInput } from './orders.schema';
 
@@ -55,20 +57,13 @@ export const ordersService = {
 
   /**
    * Called inside a payment transaction once the advance is received.
-   * Tells the warehouse what to pack (dispatch row) and puts the job on a
-   * technician's schedule (least-loaded technician, 3 working days out).
+   * Tells the warehouse what to pack (dispatch row) and opens the installation job.
+   * No technician is chosen yet: sales assigns one after the materials are delivered.
    */
   async confirm(db: Db, orderId: number, userId: number) {
     await repo.markConfirmed(db, orderId);
     await repo.ensureDispatch(db, orderId);
-    const job = await repo.ensureJob(db, orderId);
-    if (job) {
-      const tech = await repo.leastLoadedTechnician(db);
-      if (tech) {
-        await repo.scheduleJob(db, job.id, workingDayFromNow(3));
-        await repo.addCrew(db, job.id, tech.id);
-      }
-    }
+    await repo.ensureJob(db, orderId);
     await logActivity(db, 'order', orderId, 'confirmed', userId, { advancePercent: env.advancePercent });
   },
 
@@ -91,14 +86,20 @@ export const ordersService = {
       const job = await repo.lockJob(db, id);
       if (!job) throw unprocessable('The order is not confirmed yet: record the advance payment first');
       if (job.status === 'completed') throw unprocessable('This installation is already completed');
+      const shipped = await repo.dispatchStatus(db, id);
+      if (shipped !== 'delivered')
+        throw unprocessable(`A technician is assigned after the materials are delivered. This order's shipment is "${shipped ? shipped.replace('_', ' ') : 'not started'}".`);
       const techs = await repo.activeTechnicians(db, d.technicianIds);
       if (techs.length !== new Set(d.technicianIds).size)
         throw unprocessable('Every crew member must be an active technician', { technicianIds: 'Invalid technician selected' });
+      for (const t of techs) await availabilityService.assertFree(db, t.id, d.scheduledDate, job.id);
       await repo.clearCrew(db, job.id);
       for (const t of techs) await repo.addCrew(db, job.id, t.id);
       await repo.scheduleJob(db, job.id, d.scheduledDate);
       await logActivity(db, 'order', id, 'job_scheduled', userId, d);
     });
-    return this.get(id);
+    const o: Record<string, any> = await this.get(id);
+    notifyUsers(d.technicianIds, 'job:scheduled', { title: `New installation for you: ${o.customer_name} on ${d.scheduledDate}`, link: `/jobs/${o.job?.id}` });
+    return o;
   },
 };

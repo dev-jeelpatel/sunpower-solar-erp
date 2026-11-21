@@ -7,7 +7,7 @@ export const jobsRepository = {
   list: (technicianId: number | null, status: string | null) =>
     q(
       prisma,
-      `SELECT j.id, j.status, j.scheduled_date, j.finished_at, o.order_no, o.status AS order_status, c.name AS customer_name, c.address, c.city, c.phone,
+      `SELECT j.id, j.order_id, j.status, j.scheduled_date, j.finished_at, o.order_no, o.status AS order_status, c.name AS customer_name, c.address, c.city, c.phone,
               pk.name AS package_name, pk.capacity_kw, d.status AS dispatch_status,
               (SELECT json_agg(u.name) FROM job_crew jc JOIN users u ON u.id = jc.user_id WHERE jc.job_id = j.id) AS crew
          FROM installation_jobs j JOIN orders o ON o.id = j.order_id JOIN customers c ON c.id = o.customer_id

@@ -122,4 +122,6 @@ export const ordersRepository = {
     q1<{ id: number; status: string }>(db, 'SELECT j.id, j.status FROM installation_jobs j WHERE j.order_id = $1 FOR UPDATE', [orderId]),
   activeTechnicians: (db: Db, ids: number[]) =>
     q<{ id: number }>(db, `SELECT id FROM users WHERE id = ANY($1::int[]) AND role = 'technician' AND active`, [ids]),
+
+  dispatchStatus: async (db: Db, orderId: number) => (await q1<{ status: string }>(db, 'SELECT status FROM dispatches WHERE order_id = $1', [orderId]))?.status ?? null,
 };
