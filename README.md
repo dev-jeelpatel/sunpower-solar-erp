@@ -216,6 +216,25 @@ unique and tied to one customer.
 
 ---
 
+### Warranty claims
+
+A warranty claim is a formal request to repair or replace a faulty unit under warranty (page **Warranty claims**, `/claims`). It is separate from a service ticket, which is any complaint, paid or free.
+
+| Step | Who | What happens |
+|---|---|---|
+| 1. File | support | Enter the serial number and the problem. The customer is found from the serial and the warranty is checked on the spot: **in warranty** or **ended**. A unit can have only one open claim (enforced by the database). Only delivered units can be claimed |
+| 2. Book inspection | support | Pick a technician and a date. Busy technicians cannot be chosen (an inspection counts like a survey for availability) |
+| 3. Inspect | the technician | Submit findings, the most likely cause (manufacturing defect, installation fault, wear and tear, physical damage, misuse, power surge, other) and a recommendation (repair, replace, no fault) |
+| 4. Decide | support (admin for goodwill) | Approve as repair or replacement, or reject with a reason of at least 10 characters. A claim whose warranty had ended can only be approved as **goodwill**, and only by an admin. A claim can be rejected at any point before approval |
+| 5. Fulfil | support or warehouse | **Replace:** enter a same-model serial from stock. The faulty unit becomes `faulty`, the new one goes to the customer and **keeps the remaining warranty**, and stock goes down by one. **Repair:** describe the work and record the cost we absorbed |
+| 6. Supplier return | warehouse | For a replaced unit: mark it sent to the supplier with a reference, then record the credit received |
+| 7. Close | support | When the customer confirms it works. A customer can also withdraw a claim before the decision |
+
+Every step is recorded in the activity timeline on the claim. Technicians only see claims assigned to them; the director is read-only.
+
+`backend/scripts/e2e-claims.cjs` checks the whole process (63 checks). It writes test data, so run it only on a throwaway database:
+`API_URL=http://localhost:4100/api DATABASE_URL=<scratch database> node scripts/e2e-claims.cjs --confirm`
+
 ### Adding, editing and deleting records
 
 Every list has the actions it needs, and each delete follows a safety rule so history is never lost:

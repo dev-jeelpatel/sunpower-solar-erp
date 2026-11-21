@@ -11,6 +11,7 @@ export const ticketsController = {
   get: wrap(async (req, res) => res.json(await ticketsService.get(idOf(req)))),
   create: wrap(async (req, res) => res.status(201).json(await ticketsService.create(req.body, req.user.id))),
   assign: wrap(async (req, res) => res.json(await ticketsService.assign(idOf(req), req.body.userId))),
+  addLines: wrap(async (req, res) => res.status(201).json(await ticketsService.addLines(idOf(req), req.body.lines))),
   addLine: wrap(async (req, res) => res.status(201).json(await ticketsService.addLine(idOf(req), req.body))),
   removeLine: wrap(async (req, res) => res.json(await ticketsService.removeLine(idOf(req), Number(req.params.lineId)))),
   resolve: wrap(async (req, res) => res.json(await ticketsService.resolve(idOf(req), req.body, req.user.id))),

@@ -27,6 +27,10 @@ export const lineSchema = z
   .refine((l) => l.productId || l.description, { path: ['description'], message: 'Choose a part or describe the labour' });
 export type LineInput = z.infer<typeof lineSchema>;
 
+/** Several parts and labour lines added together; all of them are saved or none. */
+export const batchLinesSchema = z.object({ lines: z.array(lineSchema).min(1, 'Add at least one line').max(20, 'Add at most 20 lines at a time') });
+export type BatchLinesInput = z.infer<typeof batchLinesSchema>;
+
 export const resolveSchema = z.object({
   resolution: text('Resolution', { min: 5, max: 1000 }),
   replacementSerial: z.preprocess(blank, serial.optional()),

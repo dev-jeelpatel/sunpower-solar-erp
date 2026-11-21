@@ -54,25 +54,32 @@ export const ticketsService = {
     return this.get(id);
   },
 
-  async addLine(id: number, d: LineInput) {
+  /** Add one or many lines in a single step. If any line is wrong, none are saved. */
+  async addLines(id: number, lines: LineInput[]) {
     await tx(async (db) => {
       const t = await repo.lock(db, id);
       if (!t) throw notFound('Ticket');
       if (!OPEN.includes(t.status)) throw unprocessable('This ticket is already resolved');
-      let price = d.unitPrice;
-      let cost = 0;
-      let desc = d.description;
-      if (d.productId) {
-        const p = await repo.product(db, d.productId);
-        if (!p) throw notFound('Product');
-        price = price ?? p.sell_price;
-        cost = p.cost_price;
-        desc = desc || p.name;
+      for (const [i, d] of lines.entries()) {
+        let price = d.unitPrice;
+        let cost = 0;
+        let desc = d.description;
+        if (d.productId) {
+          const p = await repo.product(db, d.productId);
+          if (!p) throw notFound(`Product on line ${i + 1}`);
+          price = price ?? p.sell_price;
+          cost = p.cost_price;
+          desc = desc || p.name;
+        }
+        if (price == null) throw unprocessable(`Line ${i + 1}: enter a price`, { unitPrice: 'Price is required for labour' });
+        await repo.insertLine(db, id, d, desc, price, cost);
       }
-      if (price == null) throw unprocessable('Enter a price', { unitPrice: 'Price is required for labour' });
-      await repo.insertLine(db, id, d, desc, price, cost);
     });
     return this.get(id);
+  },
+
+  addLine(id: number, d: LineInput) {
+    return this.addLines(id, [d]);
   },
 
   async removeLine(id: number, lineId: number) {

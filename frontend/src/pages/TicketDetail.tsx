@@ -2,32 +2,85 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { del, get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
-import { Async, Badge, Card, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { Async, Badge, Card, Field, Modal, PageHead, Seg, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { validate, required, minLen, positive } from '../validators';
 import * as V from '../validators';
 
+type Row = { kind: 'part' | 'labour'; productId: string; description: string; quantity: string; unitPrice: string };
+const blankRow = (): Row => ({ kind: 'part', productId: '', description: '', quantity: '1', unitPrice: '' });
+
+/** Add several parts and labour lines in one go. */
 function LineModal({ t, onClose, onDone }) {
   const prods = useAsync(() => get('/catalog/products'));
-  const f = useForm({ kind: 'part', productId: '', description: '', quantity: '1', unitPrice: '' });
-  const { run, busy, error } = useAction(f.setErrors);
-  const v = f.values;
-  const pick = (id) => { f.set('productId', id); const p = prods.data?.find((x) => String(x.product_id) === id); if (p) f.setValues((s) => ({ ...s, productId: id, unitPrice: String(p.sell_price) })); };
+  const [rows, setRows] = useState<Row[]>([blankRow()]);
+  const [errs, setErrs] = useState<Record<number, Record<string, string>>>({});
+  const [top, setTop] = useState('');
+  const { run, busy, error } = useAction();
+  const parts: any[] = (prods.data || []).filter((p) => p.category !== 'service' && !p.tracked_serial);
+
+  const upd = (i: number, patch: Partial<Row>) => {
+    setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+    if (errs[i]) setErrs({ ...errs, [i]: {} });
+  };
+  const pick = (i: number, id: string) => {
+    const p = parts.find((x) => String(x.product_id) === id);
+    upd(i, { productId: id, unitPrice: p ? String(p.sell_price) : '' });
+  };
+  const lineTotal = (r: Row) => (Number(r.quantity) || 0) * (Number(r.unitPrice) || 0);
+  const total = rows.reduce((s, r) => s + lineTotal(r), 0);
+
   const submit = async () => {
-    const errs = validate(v, { quantity: [required('Quantity'), positive('Quantity')], ...(v.kind === 'part' ? { productId: [required('Part')] } : { description: [required('Description')], unitPrice: [required('Rate')] }) });
-    f.setErrors(errs);
-    if (Object.keys(errs).length) return;
-    const ok = await run(() => post(`/tickets/${t.id}/lines`, { productId: v.kind === 'part' ? Number(v.productId) : undefined, description: v.description || undefined, quantity: Number(v.quantity), unitPrice: v.unitPrice === '' ? undefined : Number(v.unitPrice), isLabour: v.kind === 'labour' }), 'Line added');
+    const all: Record<number, Record<string, string>> = {};
+    rows.forEach((r, i) => {
+      const e = validate(r, {
+        quantity: [required('Quantity'), positive('Quantity'), V.range(0, 1000, 'Quantity')],
+        unitPrice: [required('Rate'), V.moneyAmount('Rate', 0, 1000000)],
+        ...(r.kind === 'part' ? { productId: [required('Part')] } : { description: [required('Description'), V.noMarkup('Description')] }),
+      });
+      if (Object.keys(e).length) all[i] = e;
+    });
+    const partIds = rows.filter((r) => r.kind === 'part' && r.productId).map((r) => r.productId);
+    const dup = partIds.find((x, i) => partIds.indexOf(x) !== i);
+    setErrs(all);
+    setTop(dup ? 'The same part is on two lines. Combine them into one line with the total quantity.' : '');
+    if (Object.keys(all).length || dup) return;
+    const lines = rows.map((r) => ({
+      productId: r.kind === 'part' ? Number(r.productId) : undefined,
+      description: r.kind === 'labour' ? r.description : undefined,
+      quantity: Number(r.quantity), unitPrice: Number(r.unitPrice), isLabour: r.kind === 'labour',
+    }));
+    const ok = await run(() => post(`/tickets/${t.id}/lines/batch`, { lines }), rows.length === 1 ? 'Line added' : `${rows.length} lines added`);
     if (ok) onDone();
   };
+
   return (
-    <Modal title="Add part or labour" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Add</button></>}>
-      {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
-      <div className="form-grid">
-        <Field label="Type" className="full"><select {...f.bind('kind')}><option value="part">Spare part from stock</option><option value="labour">Labour / service charge</option></select></Field>
-        {v.kind === 'part' ? <Field label="Part" error={f.errors.productId} className="full"><select value={v.productId} onChange={(e) => pick(e.target.value)}><option value="">Select…</option>{(prods.data || []).filter((p) => p.category !== 'service' && !p.tracked_serial).map((p) => <option key={p.product_id} value={p.product_id}>{p.name} ({p.on_hand} in stock)</option>)}</select></Field>
-          : <Field label="Description" rules={[V.noMarkup('Description')]} error={f.errors.description} className="full"><input {...f.bind('description')} placeholder="e.g. Site visit & diagnosis" /></Field>}
-        <Field label="Quantity / hours" rules={[V.required('Quantity'), V.positive('Quantity'), V.range(0, 1000, 'Quantity')]} error={f.errors.quantity}><input type="number" step="0.5" {...f.bind('quantity')} /></Field>
-        <Field label="Rate (₹)" rules={[V.required('Rate'), V.moneyAmount('Rate', 0, 1000000)]} error={f.errors.unitPrice}><input type="number" {...f.bind('unitPrice')} /></Field>
+    <Modal title="Add parts and labour" wide onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Add {rows.length > 1 ? `${rows.length} lines` : 'line'}</button></>}>
+      {(error || top) && <div className="alert bad" style={{ marginBottom: 12 }}>{top || error}</div>}
+      <div className="stack">
+        {rows.map((r, i) => {
+          const e = errs[i] || {};
+          return (
+            <div key={i} className="tl-row">
+              <div className="tl-head">
+                <b>Line {i + 1}</b>
+                <Seg value={r.kind} onChange={(k) => upd(i, { kind: k as Row['kind'], productId: '', description: '', unitPrice: '' })} options={[['part', 'Spare part'], ['labour', 'Labour / service']]} />
+                {rows.length > 1 && <button type="button" className="btn secondary sm" onClick={() => { setRows(rows.filter((_, j) => j !== i)); setErrs({}); }} aria-label={`Remove line ${i + 1}`}>Remove</button>}
+              </div>
+              <div className="form-grid">
+                {r.kind === 'part'
+                  ? <Field label="Part from stock" error={e.productId} className="full"><select value={r.productId} onChange={(ev) => pick(i, ev.target.value)}><option value="">Select…</option>{parts.map((p) => <option key={p.product_id} value={p.product_id}>{p.name} · {money(p.sell_price)} · {p.on_hand} in stock</option>)}</select></Field>
+                  : <Field label="What is the charge for" rules={[V.noMarkup('Description')]} error={e.description} className="full"><input value={r.description} onChange={(ev) => upd(i, { description: ev.target.value })} placeholder="e.g. Site visit and diagnosis" maxLength={200} /></Field>}
+                <Field label={r.kind === 'part' ? 'Quantity' : 'Hours or units'} rules={[V.required('Quantity'), V.positive('Quantity'), V.range(0, 1000, 'Quantity')]} error={e.quantity}><input type="number" step={r.kind === 'part' ? '1' : '0.5'} min="0" value={r.quantity} onChange={(ev) => upd(i, { quantity: ev.target.value })} /></Field>
+                <Field label="Rate (₹)" rules={[V.required('Rate'), V.moneyAmount('Rate', 0, 1000000)]} error={e.unitPrice}><input type="number" min="0" value={r.unitPrice} onChange={(ev) => upd(i, { unitPrice: ev.target.value })} /></Field>
+              </div>
+              <div className="tl-sum">Line total <b>{money(lineTotal(r), true)}</b></div>
+            </div>
+          );
+        })}
+        <div className="row between">
+          <button type="button" className="btn secondary" onClick={() => { if (rows.length < 20) setRows([...rows, blankRow()]); }} disabled={rows.length >= 20}>+ Add another part or labour</button>
+          <span className="muted">Total for {rows.length} line{rows.length === 1 ? '' : 's'}: <b>{money(total, true)}</b></span>
+        </div>
       </div>
     </Modal>
   );
