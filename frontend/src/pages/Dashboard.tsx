@@ -76,6 +76,74 @@ const QUICK: { to: string; text: string; icon: IconName; roles: string[] }[] = [
   { to: '/customers', text: 'Customers', icon: 'users', roles: ['director', 'support'] },
 ];
 
+const PIPE_STAGES: [string, string][] = [
+  ['new', 'New'], ['contacted', 'Contacted'], ['qualified', 'Qualified'], ['survey_scheduled', 'Survey booked'],
+  ['survey_approved', 'Survey approved'], ['quoted', 'Quote sent'], ['won', 'Won'], ['lost', 'Lost'],
+];
+
+/** Sales pipeline: a ring split by stage, with a legend you can hover and click (opens the enquiries at that stage). */
+function Pipeline({ data }: { data: { status: string; n: number }[] }) {
+  const [hot, setHot] = useState<string | null>(null);
+  const nOf = (s: string) => data.find((p) => p.status === s)?.n || 0;
+  const total = data.reduce((a, b) => a + b.n, 0);
+  if (total === 0) return <Empty>No enquiries yet</Empty>;
+
+  const R = 46;
+  const C = 2 * Math.PI * R;
+  const GAP = 2.2;
+  let acc = 0;
+  const segs = PIPE_STAGES.filter(([s]) => nOf(s) > 0).map(([s, l]) => {
+    const frac = nOf(s) / total;
+    const len = Math.max(frac * C - GAP, 0.6);
+    const seg = { s, l, len, offset: -acc };
+    acc += frac * C;
+    return seg;
+  });
+  const hotStage = hot ? PIPE_STAGES.find(([s]) => s === hot) : null;
+  const won = nOf('won');
+
+  return (
+    <div className="dn">
+      <div className="dn-ring">
+        <svg viewBox="0 0 120 120" role="img" aria-label="Enquiries by stage">
+          <circle cx="60" cy="60" r={R} fill="none" stroke="#eef1f7" strokeWidth="14" />
+          <g transform="rotate(-90 60 60)">
+            {segs.map((g, i) => (
+              <circle
+                key={g.s} cx="60" cy="60" r={R} fill="none" stroke={PIPE_TONE[g.s]} strokeLinecap="butt"
+                strokeWidth={hot === g.s ? 18 : 14} strokeDasharray={`${g.len} ${C - g.len}`} strokeDashoffset={g.offset}
+                opacity={hot && hot !== g.s ? 0.35 : 1} className="dn-seg" style={{ animationDelay: `${i * 70}ms`, '--c': C } as any}
+                onMouseEnter={() => setHot(g.s)} onMouseLeave={() => setHot(null)}
+              />
+            ))}
+          </g>
+        </svg>
+        <div className="dn-mid">
+          <b>{hotStage ? nOf(hotStage[0]) : total}</b>
+          <span>{hotStage ? hotStage[1] : 'enquiries'}</span>
+          {!hotStage && <em>{total ? Math.round((won / total) * 100) : 0}% won</em>}
+          {hotStage && <em>{Math.round((nOf(hotStage[0]) / total) * 100)}% of all</em>}
+        </div>
+      </div>
+      <ul className="dn-legend">
+        {PIPE_STAGES.map(([s, l]) => {
+          const n = nOf(s);
+          return (
+            <li key={s} className={`${hot === s ? 'on' : ''} ${n === 0 ? 'zero' : ''}`} onMouseEnter={() => setHot(s)} onMouseLeave={() => setHot(null)}>
+              <Link to={`/enquiries?status=${s}`}>
+                <i style={{ background: PIPE_TONE[s] }} />
+                <span>{l}</span>
+                <b>{n}</b>
+                <em>{Math.round((n / total) * 100)}%</em>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const user = useCurrentUser();
   const [period, setPeriod] = useState('month');
@@ -151,21 +219,8 @@ export default function Dashboard() {
 
             <div className="grid g2">
               <section className="card dcard">
-                <div className="dcard-head"><div><h2>Sales pipeline</h2><p>{totalLeads === 1 && !d.pipeline.length ? 'No enquiries yet' : `${d.pipeline.reduce((a: number, b: any) => a + b.n, 0)} enquiries by stage`}</p></div></div>
-                {d.pipeline.length === 0 ? <Empty>No enquiries yet</Empty> : (
-                  <div className="funnel">
-                    {PIPE_ORDER.map((s) => {
-                      const n = d.pipeline.find((p: any) => p.status === s)?.n || 0;
-                      return (
-                        <div key={s} className="funnel-row">
-                          <span className="funnel-label">{label(s)}</span>
-                          <div className="funnel-track"><i style={{ width: `${Math.max((n / totalLeads) * 100, n ? 4 : 0)}%`, background: PIPE_TONE[s] }} /></div>
-                          <b>{n}</b>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <div className="dcard-head"><div><h2>Sales pipeline</h2><p>How enquiries move from first contact to a won order</p></div><Link to="/enquiries" className="dlink">All enquiries<Icon n="arrow" /></Link></div>
+                <Pipeline data={d.pipeline} />
               </section>
 
               <section className="card dcard">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Icon, type IconName } from '../components/icons';
@@ -107,7 +107,8 @@ function Board({ items, onOpen }: { items: any[]; onOpen: (id: number) => void }
 export default function Enquiries() {
   const user = useCurrentUser();
   const nav = useNavigate();
-  const [status, setStatus] = useState('');
+  const [params] = useSearchParams();
+  const [status, setStatus] = useState(params.get('status') || ''); // the dashboard funnel links here with ?status=
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const [all, setAll] = useState(true); // salespeople see every enquiry by default; "Assigned to me" narrows it
