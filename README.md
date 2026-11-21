@@ -204,7 +204,7 @@ Enquiry -> phone qualification -> site survey (approved) -> quote -> order + inv
 | Dispatch | The warehouse scans each serial number onto the order. The truck cannot leave until every serial-tracked item is scanned. Bulk items are deducted from stock |
 | Delivery | Marking delivered starts the warranty clock on every serial of that dispatch |
 | Install | The technician uploads photos and records the finish time and installed size. The customer signs on screen |
-| Support | A ticket is raised from a serial number. In warranty it is free. Out of warranty, an invoice for parts and labour is generated. A replacement serial swaps the faulty unit and starts a new warranty |
+| Support | A ticket is raised from the customer's **mobile number** (staff see everything the customer owns and pick the faulty item) or from a serial number. In warranty it is free. Out of warranty, an invoice for parts and labour is generated. A replacement serial swaps the faulty unit and starts a new warranty |
 
 **Constants** (`backend/src/config/env.ts`): advance 30% (`ADVANCE_PERCENT`), GST 5% (`GST_PERCENT`), quote validity 15 days.
 **Subsidy** (PM Surya Ghar): Rs 30,000 per kW up to 2 kW, capped at Rs 78,000 from 3 kW.

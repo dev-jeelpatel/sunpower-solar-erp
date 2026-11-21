@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
@@ -7,35 +7,123 @@ import { Avatar, Chips, Kpi, KpiRow, Person, Tag, ago } from '../components/kit'
 import { Icon, type IconName } from '../components/icons';
 import { validate, required, minLen } from '../validators';
 
-function NewTicket({ onClose, initialSerial = '' }) {
+/**
+ * Raise a service ticket. Staff can find the customer by mobile number and pick the faulty item from
+ * everything that customer owns, or (as before) start from a serial number.
+ */
+function NewTicket({ onClose, initialSerial = '' }: { onClose: () => void; initialSerial?: string }) {
   const nav = useNavigate();
+  const [mode, setMode] = useState<'mobile' | 'serial'>(initialSerial ? 'serial' : 'mobile');
   const f = useForm({ serial: initialSerial, subject: '', faultCode: '', priority: 'normal', description: '' });
-  const [found, setFound] = useState<any>(null);
-  const [lookupErr, setLookupErr] = useState('');
   const { run, busy, error } = useAction(f.setErrors);
 
+  // ----- serial-number mode -----
+  const [found, setFound] = useState<any>(null);
+  const [lookupErr, setLookupErr] = useState('');
   const check = async () => {
     const s = f.values.serial.trim();
     if (!s) return;
     setLookupErr(''); setFound(null);
     try { setFound(await get(`/inventory/units/lookup/${encodeURIComponent(s)}`)); } catch (e) { setLookupErr(e.message); }
   };
+
+  // ----- mobile-number mode -----
+  const [phone, setPhone] = useState('');
+  const [cust, setCust] = useState<any>(null); // customer detail incl. units
+  const [phoneErr, setPhoneErr] = useState('');
+  const [looking, setLooking] = useState(false);
+  const [picked, setPicked] = useState(''); // serial of the faulty item; '' = not about one specific item
+  const lastLooked = useRef('');
+  const digits = phone.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+  const phoneOk = /^[6-9]\d{9}$/.test(digits);
+
+  const findCustomer = async (num = digits) => {
+    if (!/^[6-9]\d{9}$/.test(num)) { setPhoneErr('Enter a valid 10-digit mobile number'); return; }
+    lastLooked.current = num;
+    setLooking(true); setPhoneErr(''); setCust(null); setPicked('');
+    try {
+      const s = await get(`/search?q=${num}`);
+      const c = (s.customers || []).find((x: any) => String(x.phone) === num);
+      if (!c) { setPhoneErr('No customer is registered with this number'); return; }
+      const detail = await get(`/customers/${c.id}`);
+      setCust(detail);
+      if (detail.units.length === 1) setPicked(detail.units[0].serial_no);
+    } catch (e) { setPhoneErr(e.message); } finally { setLooking(false); }
+  };
+  const onPhone = (v: string) => {
+    setPhone(v);
+    const d = v.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+    if (/^[6-9]\d{9}$/.test(d) && d !== lastLooked.current) findCustomer(d); // search as soon as the number is complete
+    if (d !== lastLooked.current) { setCust(null); setPicked(''); }
+  };
+
   const submit = async () => {
-    const errs = validate(f.values, { serial: [required('Serial number')], subject: [required('Subject'), minLen(5, 'Subject')] });
+    const rules: Record<string, any[]> = { subject: [required('Subject'), minLen(5, 'Subject')] };
+    if (mode === 'serial') rules.serial = [required('Serial number')];
+    const errs = validate(f.values, rules);
+    if (mode === 'mobile' && !cust) errs.phone = 'Find the customer by mobile number first';
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
-    const r = await run(() => post('/tickets', { ...f.values }), 'Ticket created');
+    const body = mode === 'serial'
+      ? { ...f.values }
+      : { ...f.values, serial: picked || undefined, customerId: picked ? undefined : cust.id };
+    const r = await run(() => post('/tickets', body), 'Ticket created');
     if (r?.id) nav(`/tickets/${r.id}`);
   };
+
   return (
     <Modal title="New service ticket" onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Create ticket</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Inverter / battery serial number" required error={f.errors.serial || lookupErr} className="full" hint="Found on the unit label. We find the customer and warranty automatically.">
-          <div className="row" style={{ flexWrap: 'nowrap' }}><input className="mono" value={f.values.serial} onChange={(e) => { f.set('serial', e.target.value.toUpperCase()); setFound(null); }} onBlur={check} /><button type="button" className="btn secondary" onClick={check}>Look up</button></div>
-        </Field>
-        {found && <div className={`alert ${found.warranty_state === 'in_warranty' ? 'ok' : 'warn'} full`}>
-          <b>{found.product_name}</b> · {found.customer_name || 'not delivered'} · {found.warranty_state === 'in_warranty' ? `In warranty until ${fmtDate(found.warranty_end)}: repair is free` : found.warranty_state === 'expired' ? `Warranty expired ${fmtDate(found.warranty_end)}: repair will be billed` : 'Warranty not started'}</div>}
+        <div className="full">
+          <div className="viewtog" role="group" aria-label="Find the customer by">
+            <button type="button" className={mode === 'mobile' ? 'on' : ''} onClick={() => setMode('mobile')}><Icon n="phone" />Mobile number</button>
+            <button type="button" className={mode === 'serial' ? 'on' : ''} onClick={() => setMode('serial')}><Icon n="search" />Serial number</button>
+          </div>
+        </div>
+
+        {mode === 'mobile' ? (
+          <>
+            <Field label="Customer's mobile number" required error={phoneErr || f.errors.phone} className="full" hint="We find the customer and list the equipment they own.">
+              <div className="row" style={{ flexWrap: 'nowrap' }}>
+                <input inputMode="tel" autoFocus placeholder="98765 43210" value={phone} onChange={(e) => onPhone(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); findCustomer(); } }} />
+                <button type="button" className="btn secondary" disabled={looking || !phoneOk} onClick={() => findCustomer()}>{looking ? 'Searching…' : 'Find customer'}</button>
+              </div>
+            </Field>
+            {cust && (
+              <div className="full tk-cust">
+                <Person name={cust.name} sub={`${cust.phone}${cust.city ? ` · ${cust.city}` : ''}`} />
+                <div className="tk-pick-title">Which item has the problem?</div>
+                <div className="pickrows" role="radiogroup" aria-label="Equipment">
+                  {cust.units.map((u: any) => (
+                    <label key={u.serial_no} className={`pickrow ${picked === u.serial_no ? 'on' : ''}`}>
+                      <input type="radio" name="unit" checked={picked === u.serial_no} onChange={() => setPicked(u.serial_no)} />
+                      <span className="pk-main"><b>{u.name}</b><small className="mono">{u.serial_no}</small></span>
+                      <span className="pk-state">
+                        <Badge status={u.warranty_state} />
+                        <small>{u.warranty_state === 'in_warranty' ? `until ${fmtDate(u.warranty_end)}` : u.warranty_state === 'expired' ? `ended ${fmtDate(u.warranty_end)}` : ''}</small>
+                      </span>
+                    </label>
+                  ))}
+                  <label className={`pickrow ${picked === '' ? 'on' : ''}`}>
+                    <input type="radio" name="unit" checked={picked === ''} onChange={() => setPicked('')} />
+                    <span className="pk-main"><b>Something else</b><small>Not about one specific item. Warranty will be treated as unknown.</small></span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <Field label="Inverter / battery serial number" required error={f.errors.serial || lookupErr} className="full" hint="Found on the unit label. We find the customer and warranty automatically.">
+              <div className="row" style={{ flexWrap: 'nowrap' }}><input className="mono" value={f.values.serial} onChange={(e) => { f.set('serial', e.target.value.toUpperCase()); setFound(null); }} onBlur={check} /><button type="button" className="btn secondary" onClick={check}>Look up</button></div>
+            </Field>
+            {found && <div className={`alert ${found.warranty_state === 'in_warranty' ? 'ok' : 'warn'} full`}>
+              <b>{found.product_name}</b> · {found.customer_name || 'not delivered'} · {found.warranty_state === 'in_warranty' ? `In warranty until ${fmtDate(found.warranty_end)}: repair is free` : found.warranty_state === 'expired' ? `Warranty expired ${fmtDate(found.warranty_end)}: repair will be billed` : 'Warranty not started'}</div>}
+          </>
+        )}
+
         <Field label="Problem summary" required error={f.errors.subject} className="full"><input {...f.bind('subject')} placeholder="e.g. Inverter shows fault E04, no power" /></Field>
         <Field label="Fault code" error={f.errors.faultCode}><input {...f.bind('faultCode')} /></Field>
         <Field label="Priority"><select {...f.bind('priority')}>{['low', 'normal', 'high', 'urgent'].map((p) => <option key={p}>{p}</option>)}</select></Field>
