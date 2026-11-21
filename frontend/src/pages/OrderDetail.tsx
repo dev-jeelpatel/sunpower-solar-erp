@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { Tracker } from '../components/kit';
 import { validate, required, positive } from '../validators';
 
 export function PaymentModal({ invoice, onClose, onDone, remaining }) {
@@ -28,6 +29,18 @@ export function PaymentModal({ invoice, onClose, onDone, remaining }) {
   );
 }
 
+/** When each order stage was reached. */
+function stageTime(o: any, stage: string): string | null {
+  switch (stage) {
+    case 'pending_payment': return o.created_at;
+    case 'confirmed': return o.confirmed_at ?? null;
+    case 'dispatched': return o.dispatch?.dispatched_at ?? null;
+    case 'delivered': return o.dispatch?.delivered_at ?? null;
+    case 'completed': return o.completed_at ?? null;
+    default: return null;
+  }
+}
+
 function Schedule({ o, onClose, onDone }) {
   const techs = useAsync(() => get('/users?role=technician'));
   const f = useForm({ techs: [] as number[], date: o.job?.scheduled_date || new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10) });
@@ -47,7 +60,14 @@ function Schedule({ o, onClose, onDone }) {
   );
 }
 
-const STAGES = [['pending_payment', 'Awaiting advance'], ['confirmed', 'Confirmed'], ['dispatched', 'Dispatched'], ['delivered', 'Delivered'], ['completed', 'Installed & signed off']];
+const STAGES = [['pending_payment', 'Order placed'], ['confirmed', 'Advance received'], ['dispatched', 'Dispatched'], ['delivered', 'Delivered'], ['completed', 'Installed & signed off']];
+const STAGE_NEXT: Record<string, string> = {
+  pending_payment: 'Record the advance payment to confirm the order. The warehouse and crew are then notified automatically.',
+  confirmed: 'The warehouse packs the order and scans every serial number before the truck leaves.',
+  dispatched: 'The shipment is on its way. Mark it delivered when it reaches the customer.',
+  delivered: 'The crew installs the system, uploads photos and gets the customer sign-off.',
+  completed: 'Installed and signed off. The warranty is now running.',
+};
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -72,7 +92,9 @@ export default function OrderDetail() {
               {['pending_payment', 'confirmed'].includes(o.status) && paid === 0 && <button className="btn secondary" onClick={() => setModal('cancel')}>Cancel order</button>}
             </>} />
           {o.status === 'cancelled' ? <div className="alert bad" style={{ marginBottom: 16 }}>This order was cancelled.</div>
-            : <div className="steps" style={{ marginBottom: 16 }}>{STAGES.map(([k, l], i) => <span key={k} className={`step ${i < idx ? 'done' : i === idx ? 'now' : ''}`}>{l}</span>)}</div>}
+            : <Tracker
+                steps={STAGES.map(([k, l]) => ({ key: k, label: l, at: stageTime(o, k) }))}
+                current={idx} finished={o.status === 'completed'} next={STAGE_NEXT[o.status]} />}
           {o.status === 'pending_payment' && <div className="alert warn" style={{ marginBottom: 16 }}>The order is confirmed (warehouse + crew notified automatically) once <b>{money(o.advanceRequired)}</b> is received. Received so far: {money(paid)}.</div>}
 
           <div className="grid split">

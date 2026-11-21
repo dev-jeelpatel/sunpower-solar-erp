@@ -3,9 +3,23 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Empty, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
+import { Tracker } from '../components/kit';
 import { validate, required, positive } from '../validators';
 
 const FLOW = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won'];
+const FLOW_LABEL: Record<string, string> = {
+  new: 'Enquiry received', contacted: 'Customer called', qualified: 'Qualified', survey_scheduled: 'Survey booked',
+  survey_approved: 'Survey approved', quoted: 'Quote sent', won: 'Won',
+};
+const FLOW_NEXT: Record<string, string> = {
+  new: 'Call the customer and check their roof area, monthly bill and grid connection.',
+  contacted: 'Complete the checklist to qualify the lead, or mark it not suitable.',
+  qualified: 'Book a technician for the roof survey.',
+  survey_scheduled: 'The technician visits the roof and submits measurements for approval.',
+  survey_approved: 'Create a quote from one of the packages.',
+  quoted: 'Waiting for the customer to accept the quote.',
+  won: 'The customer accepted. Follow delivery and installation from the order.',
+};
 
 function QualifyModal({ e, onClose, onDone }) {
   const f = useForm({ decision: 'qualified', shadowFreeSqft: e.shadow_free_sqft ?? '', monthlyBill: e.monthly_bill ?? '', gridSuitable: e.grid_suitable == null ? '' : String(e.grid_suitable), notes: e.qualification_notes || '' });
@@ -105,6 +119,20 @@ function ReviewModal({ s, onClose, onDone }) {
   );
 }
 
+/** Time a stage was reached, taken from the activity log (oldest matching entry). */
+function stampFor(e: any, stage: string): string | null {
+  const first = (test: (a: string) => boolean) => [...(e.activity || [])].reverse().find((x: any) => test(x.action))?.created_at ?? null;
+  switch (stage) {
+    case 'new': return e.created_at;
+    case 'contacted': return first((a) => a.startsWith('call_logged'));
+    case 'qualified': return first((a) => a === 'call_logged:qualified');
+    case 'survey_scheduled': return first((a) => a === 'survey_scheduled');
+    case 'survey_approved': return first((a) => a === 'survey_approved');
+    case 'quoted': return first((a) => a === 'quote_created');
+    default: return null;
+  }
+}
+
 export default function EnquiryDetail() {
   const { id } = useParams();
   const user = useCurrentUser();
@@ -127,7 +155,9 @@ export default function EnquiryDetail() {
               {['survey_approved', 'quoted'].includes(e.status) && <button className="btn" onClick={() => setModal('quote')}>Create quote</button>}
             </>} />
           {e.status === 'lost' ? <div className="alert bad" style={{ marginBottom: 16 }}>This enquiry was closed as not suitable.</div>
-            : <div className="steps" style={{ marginBottom: 16 }}>{FLOW.map((s, i) => <span key={s} className={`step ${i < stepIdx || e.status === 'won' ? 'done' : i === stepIdx ? 'now' : ''}`}>{label(s)}</span>)}</div>}
+            : <Tracker
+                steps={FLOW.map((k) => ({ key: k, label: FLOW_LABEL[k], at: stampFor(e, k) }))}
+                current={stepIdx} finished={e.status === 'won'} next={FLOW_NEXT[e.status]} />}
           <div className="grid split">
             <div className="stack">
               <Card title="Request">
