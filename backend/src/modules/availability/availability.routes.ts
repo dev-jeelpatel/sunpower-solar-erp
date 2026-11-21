@@ -9,12 +9,12 @@ import { availabilityService } from './availability.service';
 export const availabilityRouter = Router();
 availabilityRouter.use(authenticate);
 
-const query = z.object({ date: isoDate('Date'), excludeJobId: z.coerce.number().int().positive().optional() });
+const query = z.object({ date: isoDate('Date'), excludeJobId: z.coerce.number().int().positive().optional(), excludeClaimId: z.coerce.number().int().positive().optional() });
 availabilityRouter.get(
   '/',
   validate(query, 'query'),
   wrap(async (req, res) => {
-    const { date, excludeJobId } = req.query as unknown as { date: string; excludeJobId?: number };
-    res.json(await availabilityService.onDate(date, excludeJobId ?? null));
+    const { date, excludeJobId, excludeClaimId } = req.query as unknown as { date: string; excludeJobId?: number; excludeClaimId?: number };
+    res.json(await availabilityService.onDate(date, excludeJobId ?? null, excludeClaimId ?? null));
   }),
 );

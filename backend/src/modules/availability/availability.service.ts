@@ -19,14 +19,14 @@ function judge(day: Day | undefined) {
     const i = day.installs[0];
     return { busy: true, reason: `Already installing ${i.orderNo} (${i.customer})`, note: null };
   }
-  if (day.surveys.length >= MAX_SURVEYS_PER_DAY) return { busy: true, reason: `${day.surveys.length} site surveys already booked`, note: null };
+  if (day.surveys.length >= MAX_SURVEYS_PER_DAY) return { busy: true, reason: `${day.surveys.length} site visits already booked`, note: null };
   if (day.surveys.length) return { busy: false, reason: null, note: `${day.surveys.length} survey${day.surveys.length === 1 ? '' : 's'} booked that day` };
   return { busy: false, reason: null, note: null };
 }
 
-async function load(db: Db, from: string, excludeJobId: number | null) {
+async function load(db: Db, from: string, excludeJobId: number | null, excludeClaimId: number | null = null) {
   const range = [from, LOOKAHEAD_DAYS + 1];
-  const [techs, installs, surveys] = await Promise.all([
+  const [techs, installs, surveys, claims] = await Promise.all([
     q<{ id: number; name: string }>(db, "SELECT id, name FROM users WHERE role = 'technician' AND active ORDER BY name"),
     q<{ user_id: number; d: string; job_id: number; order_no: string; customer: string }>(
       db,
@@ -43,6 +43,13 @@ async function load(db: Db, from: string, excludeJobId: number | null) {
         WHERE s.status = 'scheduled' AND s.scheduled_date >= $1::date AND s.scheduled_date < $1::date + $2::int`,
       range,
     ),
+    q<{ technician_id: number; d: string; claim_id: number; customer: string }>(
+      db,
+      `SELECT c.technician_id, to_char(c.inspection_date, 'YYYY-MM-DD') AS d, c.id AS claim_id, cu.name AS customer
+         FROM warranty_claims c JOIN customers cu ON cu.id = c.customer_id
+        WHERE c.status = 'inspecting' AND c.inspection_date >= $1::date AND c.inspection_date < $1::date + $2::int AND ($3::int IS NULL OR c.id <> $3)`,
+      [...range, excludeClaimId],
+    ),
   ]);
   const book = new Map<number, Map<string, Day>>();
   const day = (t: number, d: string) => {
@@ -53,6 +60,8 @@ async function load(db: Db, from: string, excludeJobId: number | null) {
   };
   for (const i of installs) day(i.user_id, i.d).installs.push({ jobId: i.job_id, orderNo: i.order_no, customer: i.customer });
   for (const s of surveys) day(s.technician_id, s.d).surveys.push({ enquiryId: s.enquiry_id, customer: s.customer });
+  // a warranty inspection is a short visit, counted like a survey
+  for (const c of claims) day(c.technician_id, c.d).surveys.push({ enquiryId: c.claim_id, customer: c.customer });
   return { techs, book };
 }
 
@@ -66,8 +75,8 @@ function nextFree(book: Map<number, Map<string, Day>>, techId: number, from: str
 
 export const availabilityService = {
   /** Every active technician with a yes/no for the date, why, and the next free day when busy. */
-  async onDate(date: string, excludeJobId: number | null = null, db: Db = prisma) {
-    const { techs, book } = await load(db, date, excludeJobId);
+  async onDate(date: string, excludeJobId: number | null = null, excludeClaimId: number | null = null, db: Db = prisma) {
+    const { techs, book } = await load(db, date, excludeJobId, excludeClaimId);
     return techs.map((t) => {
       const j = judge(book.get(t.id)?.get(date));
       return { id: t.id, name: t.name, available: !j.busy, reason: j.reason, note: j.note, nextFree: j.busy ? nextFree(book, t.id, date) : null };
@@ -75,8 +84,8 @@ export const availabilityService = {
   },
 
   /** Refuse to double-book. The message says who is busy, why, and when they are next free. */
-  async assertFree(db: Db, techId: number, date: string, excludeJobId: number | null = null) {
-    const { techs, book } = await load(db, date, excludeJobId);
+  async assertFree(db: Db, techId: number, date: string, excludeJobId: number | null = null, excludeClaimId: number | null = null) {
+    const { techs, book } = await load(db, date, excludeJobId, excludeClaimId);
     const t = techs.find((x) => x.id === techId);
     if (!t) return; // not an active technician: the caller reports that separately
     const j = judge(book.get(techId)?.get(date));
