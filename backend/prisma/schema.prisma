@@ -1,0 +1,757 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ActivityLog {
+  id        BigInt   @id @default(autoincrement())
+  entity    String   @db.VarChar(30)
+  entityId  Int      @map("entity_id")
+  action    String   @db.VarChar(60)
+  detail    Json?
+  userId    Int?     @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([entity, entityId], map: "activity_entity_idx")
+  @@map("activity_log")
+}
+
+model Customer {
+  id             Int             @id @default(autoincrement())
+  name           String          @db.VarChar(120)
+  phone          String          @unique @db.VarChar(15)
+  email          String?         @db.VarChar(150)
+  address        String
+  city           String?         @db.VarChar(80)
+  pincode        String?         @db.VarChar(6)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @default(now()) @map("updated_at") @db.Timestamptz(6)
+  enquiries      Enquiry[]
+  inventoryUnits InventoryUnit[]
+  invoices       Invoice[]
+  orders         Order[]
+  tickets        Ticket[]
+
+  @@map("customers")
+}
+
+model Dispatch {
+  id             Int             @id @default(autoincrement())
+  orderId        Int             @unique @map("order_id")
+  status         DispatchStatus  @default(pending)
+  vehicleNo      String?         @map("vehicle_no") @db.VarChar(20)
+  dispatchedAt   DateTime?       @map("dispatched_at") @db.Timestamptz(6)
+  deliveredAt    DateTime?       @map("delivered_at") @db.Timestamptz(6)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  inventoryUnits InventoryUnit[]
+
+  @@index([status])
+  @@map("dispatches")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Enquiry {
+  id                 Int           @id @default(autoincrement())
+  customerName       String        @map("customer_name") @db.VarChar(120)
+  phone              String        @db.VarChar(15)
+  email              String?       @db.VarChar(150)
+  address            String
+  city               String?       @db.VarChar(80)
+  requestedKw        Decimal       @map("requested_kw") @db.Decimal(3, 1)
+  systemType         SystemType    @map("system_type")
+  subsidyRequired    Boolean       @default(false) @map("subsidy_required")
+  message            String?
+  source             EnquirySource @default(web)
+  status             EnquiryStatus @default(new)
+  assignedTo         Int?          @map("assigned_to")
+  customerId         Int?          @map("customer_id")
+  shadowFreeSqft     Decimal?      @map("shadow_free_sqft") @db.Decimal(8, 1)
+  monthlyBill        Decimal?      @map("monthly_bill") @db.Decimal(10, 2)
+  gridSuitable       Boolean?      @map("grid_suitable")
+  qualificationNotes String?       @map("qualification_notes")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
+  assignedToUser     User?         @relation(fields: [assignedTo], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customer           Customer?     @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quotes             Quote[]
+  surveys            Survey[]
+
+  @@index([assignedTo], map: "enquiries_assigned_idx")
+  @@index([phone])
+  @@index([status])
+  @@map("enquiries")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model InstallationJob {
+  id            Int        @id @default(autoincrement())
+  orderId       Int        @unique @map("order_id")
+  status        JobStatus  @default(unscheduled)
+  scheduledDate DateTime?  @map("scheduled_date") @db.Date
+  startedAt     DateTime?  @map("started_at") @db.Timestamptz(6)
+  finishedAt    DateTime?  @map("finished_at") @db.Timestamptz(6)
+  confirmedKw   Decimal?   @map("confirmed_kw") @db.Decimal(3, 1)
+  notes         String?
+  signerName    String?    @map("signer_name") @db.VarChar(100)
+  signatureData String?    @map("signature_data")
+  signedAt      DateTime?  @map("signed_at") @db.Timestamptz(6)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  order         Order      @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  jobCrew       JobCrew[]
+  jobPhotos     JobPhoto[]
+
+  @@index([status, scheduledDate], map: "jobs_status_idx")
+  @@map("installation_jobs")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model InventoryUnit {
+  id                     Int            @id @default(autoincrement())
+  productId              Int            @map("product_id")
+  serialNo               String         @unique @map("serial_no") @db.VarChar(40)
+  status                 UnitStatus     @default(in_stock)
+  poId                   Int?           @map("po_id")
+  dispatchId             Int?           @map("dispatch_id")
+  orderId                Int?           @map("order_id")
+  customerId             Int?           @map("customer_id")
+  warrantyStart          DateTime?      @map("warranty_start") @db.Date
+  warrantyEnd            DateTime?      @map("warranty_end") @db.Date
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  customer               Customer?      @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  dispatch               Dispatch?      @relation(fields: [dispatchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  order                  Order?         @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  po                     PurchaseOrder? @relation(fields: [poId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  product                Product        @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ticketsReplacementUnit Ticket[]       @relation("tickets_replacement_unit_idToinventory_units")
+  ticketsUnit            Ticket[]       @relation("tickets_unit_idToinventory_units")
+
+  @@index([customerId], map: "units_customer_idx")
+  @@index([dispatchId], map: "units_dispatch_idx")
+  @@index([productId, status], map: "units_product_status_idx")
+  @@map("inventory_units")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model InvoiceItem {
+  id          Int     @id @default(autoincrement())
+  invoiceId   Int     @map("invoice_id")
+  description String  @db.VarChar(200)
+  quantity    Decimal @db.Decimal(8, 2)
+  unitPrice   Decimal @map("unit_price") @db.Decimal(12, 2)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([invoiceId], map: "invoice_items_invoice_idx")
+  @@map("invoice_items")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Invoice {
+  id           Int           @id @default(autoincrement())
+  invoiceNo    String        @unique @default(dbgenerated("((('INV-'::text || to_char(now(), 'YYYY'::text)) || '-'::text) || lpad((nextval('invoice_seq'::regclass))::text, 4, '0'::text))")) @map("invoice_no") @db.VarChar(20)
+  kind         InvoiceKind
+  orderId      Int?          @map("order_id")
+  ticketId     Int?          @map("ticket_id")
+  customerId   Int           @map("customer_id")
+  status       InvoiceStatus @default(sent)
+  subtotal     Decimal       @db.Decimal(12, 2)
+  taxAmount    Decimal       @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  total        Decimal       @db.Decimal(12, 2)
+  issuedAt     DateTime      @default(dbgenerated("CURRENT_DATE")) @map("issued_at") @db.Date
+  dueDate      DateTime      @default(dbgenerated("(CURRENT_DATE + 15)")) @map("due_date") @db.Date
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  invoiceItems InvoiceItem[]
+  customer     Customer      @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  order        Order?        @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ticket       Ticket?       @relation(fields: [ticketId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "invoices_ticket_fk")
+  payments     Payment[]
+
+  @@index([customerId], map: "invoices_customer_idx")
+  @@index([orderId], map: "invoices_order_idx")
+  @@index([status])
+  @@index([ticketId], map: "invoices_ticket_idx")
+  @@map("invoices")
+}
+
+model JobCrew {
+  jobId  Int             @map("job_id")
+  userId Int             @map("user_id")
+  job    InstallationJob @relation(fields: [jobId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user   User            @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([jobId, userId])
+  @@index([userId], map: "job_crew_user_idx")
+  @@map("job_crew")
+}
+
+model JobPhoto {
+  id             Int             @id @default(autoincrement())
+  jobId          Int             @map("job_id")
+  filePath       String          @map("file_path") @db.VarChar(255)
+  caption        String?         @db.VarChar(150)
+  uploadedBy     Int?            @map("uploaded_by")
+  uploadedAt     DateTime        @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  job            InstallationJob @relation(fields: [jobId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  uploadedByUser User?           @relation(fields: [uploadedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([jobId], map: "job_photos_job_idx")
+  @@map("job_photos")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int     @map("order_id")
+  productId Int     @map("product_id")
+  quantity  Int
+  unitPrice Decimal @map("unit_price") @db.Decimal(12, 2)
+  unitCost  Decimal @map("unit_cost") @db.Decimal(12, 2)
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product   Product @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([orderId, productId])
+  @@map("order_items")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Order {
+  id                 Int                 @id @default(autoincrement())
+  orderNo            String              @unique @default(dbgenerated("((('SO-'::text || to_char(now(), 'YYYY'::text)) || '-'::text) || lpad((nextval('order_seq'::regclass))::text, 4, '0'::text))")) @map("order_no") @db.VarChar(20)
+  quoteId            Int                 @unique @map("quote_id")
+  customerId         Int                 @map("customer_id")
+  status             OrderStatus         @default(pending_payment)
+  total              Decimal             @db.Decimal(12, 2)
+  confirmedAt        DateTime?           @map("confirmed_at") @db.Timestamptz(6)
+  completedAt        DateTime?           @map("completed_at") @db.Timestamptz(6)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  Dispatch           Dispatch?
+  InstallationJob    InstallationJob?
+  inventoryUnits     InventoryUnit[]
+  invoices           Invoice[]
+  orderItems         OrderItem[]
+  customer           Customer            @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quote              Quote               @relation(fields: [quoteId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  SubsidyApplication SubsidyApplication?
+
+  @@index([customerId], map: "orders_customer_idx")
+  @@index([status])
+  @@map("orders")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model PackageItem {
+  packageId Int     @map("package_id")
+  productId Int     @map("product_id")
+  quantity  Int
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product   Product @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([packageId, productId])
+  @@index([productId], map: "package_items_product_idx")
+  @@map("package_items")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Package {
+  id           Int           @id @default(autoincrement())
+  name         String        @unique @db.VarChar(120)
+  kind         PackageKind
+  capacityKw   Decimal?      @map("capacity_kw") @db.Decimal(3, 1)
+  description  String?
+  active       Boolean       @default(true)
+  packageItems PackageItem[]
+  quotes       Quote[]
+
+  @@unique([kind, capacityKw])
+  @@map("packages")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Payment {
+  id             Int           @id @default(autoincrement())
+  invoiceId      Int           @map("invoice_id")
+  amount         Decimal       @db.Decimal(12, 2)
+  method         PaymentMethod
+  reference      String?       @db.VarChar(80)
+  receivedBy     Int?          @map("received_by")
+  paidAt         DateTime      @default(now()) @map("paid_at") @db.Timestamptz(6)
+  invoice        Invoice       @relation(fields: [invoiceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  receivedByUser User?         @relation(fields: [receivedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([invoiceId], map: "payments_invoice_idx")
+  @@index([paidAt])
+  @@map("payments")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Product {
+  id                 Int                 @id @default(autoincrement())
+  sku                String              @unique @db.VarChar(30)
+  name               String              @db.VarChar(150)
+  category           ProductCategory
+  trackedSerial      Boolean             @default(false) @map("tracked_serial")
+  warrantyMonths     Int                 @default(0) @map("warranty_months")
+  costPrice          Decimal             @map("cost_price") @db.Decimal(12, 2)
+  sellPrice          Decimal             @map("sell_price") @db.Decimal(12, 2)
+  reorderLevel       Int                 @default(0) @map("reorder_level")
+  active             Boolean             @default(true)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  inventoryUnits     InventoryUnit[]
+  orderItems         OrderItem[]
+  packageItems       PackageItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  quoteItems         QuoteItem[]
+  stockMovements     StockMovement[]
+  ticketLines        TicketLine[]
+
+  @@map("products")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model PurchaseOrderItem {
+  id        Int           @id @default(autoincrement())
+  poId      Int           @map("po_id")
+  productId Int           @map("product_id")
+  quantity  Int
+  unitCost  Decimal       @map("unit_cost") @db.Decimal(12, 2)
+  po        PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product   Product       @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([poId, productId])
+  @@map("purchase_order_items")
+}
+
+model PurchaseOrder {
+  id                 Int                 @id @default(autoincrement())
+  poNo               String              @unique @default(dbgenerated("((('PO-'::text || to_char(now(), 'YYYY'::text)) || '-'::text) || lpad((nextval('po_seq'::regclass))::text, 4, '0'::text))")) @map("po_no") @db.VarChar(20)
+  supplierId         Int                 @map("supplier_id")
+  status             PoStatus            @default(ordered)
+  orderedAt          DateTime            @default(now()) @map("ordered_at") @db.Timestamptz(6)
+  receivedAt         DateTime?           @map("received_at") @db.Timestamptz(6)
+  createdBy          Int?                @map("created_by")
+  inventoryUnits     InventoryUnit[]
+  purchaseOrderItems PurchaseOrderItem[]
+  createdByUser      User?               @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  supplier           Supplier            @relation(fields: [supplierId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("purchase_orders")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model QuoteItem {
+  id          Int      @id @default(autoincrement())
+  quoteId     Int      @map("quote_id")
+  productId   Int      @map("product_id")
+  description String   @db.VarChar(200)
+  quantity    Int
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(12, 2)
+  unitCost    Decimal  @map("unit_cost") @db.Decimal(12, 2)
+  lineTotal   Decimal? @default(dbgenerated("((quantity)::numeric * unit_price)")) @map("line_total") @db.Decimal(12, 2)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([quoteId], map: "quote_items_quote_idx")
+  @@map("quote_items")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Quote {
+  id            Int         @id @default(autoincrement())
+  quoteNo       String      @unique @default(dbgenerated("((('Q-'::text || to_char(now(), 'YYYY'::text)) || '-'::text) || lpad((nextval('quote_seq'::regclass))::text, 4, '0'::text))")) @map("quote_no") @db.VarChar(20)
+  enquiryId     Int         @map("enquiry_id")
+  packageId     Int         @map("package_id")
+  status        QuoteStatus @default(draft)
+  subtotal      Decimal     @db.Decimal(12, 2)
+  discount      Decimal     @default(0) @db.Decimal(12, 2)
+  taxPercent    Decimal     @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  taxAmount     Decimal     @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  total         Decimal     @db.Decimal(12, 2)
+  validUntil    DateTime    @map("valid_until") @db.Date
+  createdBy     Int?        @map("created_by")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  Order         Order?
+  quoteItems    QuoteItem[]
+  createdByUser User?       @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  enquiry       Enquiry     @relation(fields: [enquiryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  package       Package     @relation(fields: [packageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([enquiryId], map: "quotes_enquiry_idx")
+  @@index([status])
+  @@map("quotes")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model StockMovement {
+  id            BigInt         @id @default(autoincrement())
+  productId     Int            @map("product_id")
+  qty           Int
+  reason        MovementReason
+  refType       String?        @map("ref_type") @db.VarChar(20)
+  refId         Int?           @map("ref_id")
+  createdBy     Int?           @map("created_by")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdByUser User?          @relation(fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  product       Product        @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([productId], map: "stock_movements_product_idx")
+  @@map("stock_movements")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model SubsidyApplication {
+  id             Int           @id @default(autoincrement())
+  orderId        Int           @unique @map("order_id")
+  scheme         String        @default("PM Surya Ghar: Muft Bijli Yojana") @db.VarChar(80)
+  status         SubsidyStatus @default(documents_pending)
+  expectedAmount Decimal       @default(0) @map("expected_amount") @db.Decimal(12, 2)
+  approvedAmount Decimal?      @map("approved_amount") @db.Decimal(12, 2)
+  referenceNo    String?       @map("reference_no") @db.VarChar(60)
+  submittedAt    DateTime?     @map("submitted_at") @db.Date
+  notes          String?
+  updatedAt      DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("subsidy_applications")
+}
+
+model Supplier {
+  id             Int             @id @default(autoincrement())
+  name           String          @unique @db.VarChar(120)
+  phone          String?         @db.VarChar(15)
+  email          String?         @db.VarChar(150)
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Survey {
+  id             Int          @id @default(autoincrement())
+  enquiryId      Int          @map("enquiry_id")
+  technicianId   Int          @map("technician_id")
+  scheduledDate  DateTime     @map("scheduled_date") @db.Date
+  status         SurveyStatus @default(scheduled)
+  roofDirection  String?      @map("roof_direction") @db.VarChar(2)
+  roofTiltDeg    Decimal?     @map("roof_tilt_deg") @db.Decimal(4, 1)
+  cableDistanceM Decimal?     @map("cable_distance_m") @db.Decimal(6, 1)
+  usableAreaSqft Decimal?     @map("usable_area_sqft") @db.Decimal(8, 1)
+  notes          String?
+  reviewedBy     Int?         @map("reviewed_by")
+  reviewNotes    String?      @map("review_notes")
+  completedAt    DateTime?    @map("completed_at") @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  enquiry        Enquiry      @relation(fields: [enquiryId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reviewedByUser User?        @relation("surveys_reviewed_byTousers", fields: [reviewedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  technician     User         @relation("surveys_technician_idTousers", fields: [technicianId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([enquiryId], map: "surveys_enquiry_idx")
+  @@index([technicianId], map: "surveys_tech_idx")
+  @@map("surveys")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model TechnicianPayout {
+  id          Int          @id @default(autoincrement())
+  userId      Int          @map("user_id")
+  periodMonth DateTime     @map("period_month") @db.Date
+  hours       Decimal      @db.Decimal(8, 2)
+  amount      Decimal      @db.Decimal(12, 2)
+  status      PayoutStatus @default(pending)
+  paidAt      DateTime?    @map("paid_at") @db.Timestamptz(6)
+  user        User         @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([userId, periodMonth])
+  @@map("technician_payouts")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model TicketLine {
+  id          Int      @id @default(autoincrement())
+  ticketId    Int      @map("ticket_id")
+  productId   Int?     @map("product_id")
+  description String   @db.VarChar(200)
+  quantity    Decimal  @db.Decimal(8, 2)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(12, 2)
+  unitCost    Decimal  @default(0) @map("unit_cost") @db.Decimal(12, 2)
+  isLabour    Boolean  @default(false) @map("is_labour")
+  product     Product? @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([ticketId], map: "ticket_lines_ticket_idx")
+  @@map("ticket_lines")
+}
+
+model Ticket {
+  id                  Int            @id @default(autoincrement())
+  ticketNo            String         @unique @default(dbgenerated("((('TK-'::text || to_char(now(), 'YYYY'::text)) || '-'::text) || lpad((nextval('ticket_seq'::regclass))::text, 4, '0'::text))")) @map("ticket_no") @db.VarChar(20)
+  customerId          Int            @map("customer_id")
+  unitId              Int?           @map("unit_id")
+  subject             String         @db.VarChar(150)
+  description         String?
+  faultCode           String?        @map("fault_code") @db.VarChar(30)
+  priority            TicketPriority @default(normal)
+  status              TicketStatus   @default(open)
+  warrantyStatus      WarrantyState  @default(unknown) @map("warranty_status")
+  assignedTo          Int?           @map("assigned_to")
+  resolution          String?
+  replacementUnitId   Int?           @map("replacement_unit_id")
+  resolvedAt          DateTime?      @map("resolved_at") @db.Timestamptz(6)
+  customerConfirmedAt DateTime?      @map("customer_confirmed_at") @db.Timestamptz(6)
+  createdBy           Int?           @map("created_by")
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  invoices            Invoice[]
+  ticketLines         TicketLine[]
+  assignedToUser      User?          @relation("tickets_assigned_toTousers", fields: [assignedTo], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdByUser       User?          @relation("tickets_created_byTousers", fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customer            Customer       @relation(fields: [customerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replacementUnit     InventoryUnit? @relation("tickets_replacement_unit_idToinventory_units", fields: [replacementUnitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  unit                InventoryUnit? @relation("tickets_unit_idToinventory_units", fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([customerId], map: "tickets_customer_idx")
+  @@index([status])
+  @@index([unitId], map: "tickets_unit_idx")
+  @@map("tickets")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model User {
+  id                Int                @id @default(autoincrement())
+  name              String             @db.VarChar(100)
+  email             String             @db.VarChar(150)
+  passwordHash      String             @map("password_hash")
+  role              UserRole
+  phone             String?            @db.VarChar(15)
+  hourlyRate        Decimal            @default(0) @map("hourly_rate") @db.Decimal(8, 2)
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+  activityLog       ActivityLog[]
+  enquiries         Enquiry[]
+  jobCrew           JobCrew[]
+  jobPhotos         JobPhoto[]
+  payments          Payment[]
+  purchaseOrders    PurchaseOrder[]
+  quotes            Quote[]
+  stockMovements    StockMovement[]
+  surveysReviewedBy Survey[]           @relation("surveys_reviewed_byTousers")
+  surveysTechnician Survey[]           @relation("surveys_technician_idTousers")
+  technicianPayouts TechnicianPayout[]
+  ticketsAssignedTo Ticket[]           @relation("tickets_assigned_toTousers")
+  ticketsCreatedBy  Ticket[]           @relation("tickets_created_byTousers")
+
+  @@map("users")
+}
+
+enum DispatchStatus {
+  pending
+  packing
+  dispatched
+  delivered
+
+  @@map("dispatch_status")
+}
+
+enum EnquirySource {
+  web
+  whatsapp
+  call
+  walk_in
+
+  @@map("enquiry_source")
+}
+
+enum EnquiryStatus {
+  new
+  contacted
+  qualified
+  survey_scheduled
+  survey_approved
+  quoted
+  won
+  lost
+
+  @@map("enquiry_status")
+}
+
+enum InvoiceKind {
+  order
+  service
+
+  @@map("invoice_kind")
+}
+
+enum InvoiceStatus {
+  sent
+  partially_paid
+  paid
+  void
+
+  @@map("invoice_status")
+}
+
+enum JobStatus {
+  unscheduled
+  scheduled
+  completed
+
+  @@map("job_status")
+}
+
+enum MovementReason {
+  purchase
+  dispatch
+  dispatch_reversal
+  service_part
+  adjustment
+
+  @@map("movement_reason")
+}
+
+enum OrderStatus {
+  pending_payment
+  confirmed
+  dispatched
+  delivered
+  completed
+  cancelled
+
+  @@map("order_status")
+}
+
+enum PackageKind {
+  hardware
+  on_grid
+  off_grid
+  service
+
+  @@map("package_kind")
+}
+
+enum PaymentMethod {
+  cash
+  upi
+  bank_transfer
+  cheque
+  card
+
+  @@map("payment_method")
+}
+
+enum PayoutStatus {
+  pending
+  paid
+
+  @@map("payout_status")
+}
+
+enum PoStatus {
+  ordered
+  received
+  cancelled
+
+  @@map("po_status")
+}
+
+enum ProductCategory {
+  panel
+  inverter
+  battery
+  charge_controller
+  wiring_box
+  switch
+  earthing
+  stand
+  cable
+  connector
+  service
+
+  @@map("product_category")
+}
+
+enum QuoteStatus {
+  draft
+  sent
+  accepted
+  rejected
+  expired
+
+  @@map("quote_status")
+}
+
+enum SubsidyStatus {
+  documents_pending
+  submitted
+  approved
+  disbursed
+  rejected
+
+  @@map("subsidy_status")
+}
+
+enum SurveyStatus {
+  scheduled
+  completed
+  approved
+  rejected
+
+  @@map("survey_status")
+}
+
+enum SystemType {
+  on_grid
+  off_grid
+
+  @@map("system_type")
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+
+  @@map("ticket_priority")
+}
+
+enum TicketStatus {
+  open
+  assigned
+  resolved
+  closed
+
+  @@map("ticket_status")
+}
+
+enum UnitStatus {
+  in_stock
+  dispatched
+  delivered
+  faulty
+
+  @@map("unit_status")
+}
+
+enum UserRole {
+  admin
+  sales
+  technician
+  warehouse
+  support
+  director
+
+  @@map("user_role")
+}
+
+enum WarrantyState {
+  in_warranty
+  out_of_warranty
+  unknown
+
+  @@map("warranty_state")
+}
