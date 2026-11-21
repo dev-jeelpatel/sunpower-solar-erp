@@ -184,5 +184,23 @@ async function login(name) {
   await fails('sales cannot see profitability', call('GET', '/reports/profitability', { token: tokens.sales }), 403);
   await fails('director is read-only', call('POST', '/quotes', { token: tokens.director, body: { enquiryId, packageId: pkg.id } }), 403);
 
+  console.log('Notifications and schedule');
+  const note = await ok('sales has notifications', call('GET', '/notifications', { token: tokens.sales }));
+  assert.ok(note.unread > 0, 'sales was told about the new enquiry');
+  const fresh = note.items.find((n) => !n.read_at);
+  await ok('mark one as read', call('POST', `/notifications/${fresh.id}/read`, { token: tokens.sales }));
+  const after = await ok('unread count drops', call('GET', '/notifications', { token: tokens.sales }));
+  assert.equal(after.unread, note.unread - 1);
+  await ok('mark all as read', call('POST', '/notifications/read-all', { token: tokens.sales }));
+  assert.equal((await ok('nothing unread', call('GET', '/notifications', { token: tokens.sales }))).unread, 0);
+  const other = await ok('another person has their own list', call('GET', '/notifications', { token: tokens.support }));
+  assert.ok(other.items.every((n) => !note.items.some((m) => m.id === n.id)), 'lists are separate');
+  const wide = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const calAll = await ok('calendar for sales', call('GET', '/schedule?from=2026-01-01&to=2026-03-01', { token: tokens.sales }));
+  assert.ok(Array.isArray(calAll.events) && Array.isArray(calAll.toAssign));
+  const calTech = await ok('calendar for a technician', call('GET', `/schedule?from=${tomorrow}&to=${wide}`, { token: tokens.tech1 }));
+  assert.ok(calTech.events.every((e) => e.technician_name.includes('Tejas')), 'a technician only sees their own visits');
+  await fails('calendar range is limited', call('GET', '/schedule?from=2026-01-01&to=2026-12-31', { token: tokens.sales }), 400, 'at most 10 weeks');
+
   console.log(`\nAll ${passed} checks passed.`);
 })().catch((e) => { console.error('\nFAILED:', e.message); process.exit(1); });

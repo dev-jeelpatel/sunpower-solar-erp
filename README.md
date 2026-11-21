@@ -235,6 +235,35 @@ Every step is recorded in the activity timeline on the claim. Technicians only s
 `backend/scripts/e2e-claims.cjs` checks the whole process (63 checks). It writes test data, so run it only on a throwaway database:
 `API_URL=http://localhost:4100/api DATABASE_URL=<scratch database> node scripts/e2e-claims.cjs --confirm`
 
+### Notification bell
+
+The bell in the top bar shows what needs your attention, and new items appear **instantly** (a live connection over Socket.IO, with a toast). Every notification is also saved per person, so what you missed while signed out is still there, with its own read and unread state. Click one to open the record; "Mark all as read" clears the badge.
+
+| Event | Who is told |
+|---|---|
+| New enquiry (website or staff) | sales |
+| Payment received | sales |
+| Order confirmed (advance paid) | warehouse |
+| Site survey booked | the technician |
+| Site survey submitted | sales |
+| Delivered, assign a technician | sales |
+| Installation assigned / signed off | the technician / sales and support |
+| Ticket raised / assigned | support / the assignee |
+| Warranty claim filed, inspection booked, report ready | support / the technician / support |
+| Stock running low after a dispatch | warehouse |
+
+Admin and director are told about everything addressed to a role. API: `GET /api/notifications`, `POST /api/notifications/:id/read`, `POST /api/notifications/read-all`.
+
+### Schedule: calendar and map
+
+**Schedule** (`/schedule`) shows every site survey, installation and warranty inspection on a month or week calendar, colour coded, with a filter by technician and by type. Technicians only see their own visits.
+
+- Click a day to see its visits: customer, address, tap-to-call phone, technician, status and an **Open in Maps** link.
+- Under the list a **map** shows the day's visits as numbered pins joined by a route line, with the total distance. When a shorter order exists it offers **Shortest route** and shows the kilometres saved.
+- Pins mark the **area** (or the city), not the exact house: positions come from a built-in table of Gujarat cities and areas, so no customer address is ever sent to an outside service. Only the map tiles load from OpenStreetMap.
+- The **Waiting for a technician** panel lists delivered installations that still need one, with an Assign button that applies the same availability check.
+- API: `GET /api/schedule?from=YYYY-MM-DD&to=YYYY-MM-DD[&technicianId=]` (at most 10 weeks at a time).
+
 ### Adding, editing and deleting records
 
 Every list has the actions it needs, and each delete follows a safety rule so history is never lost:
