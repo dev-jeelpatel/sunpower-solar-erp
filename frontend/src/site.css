@@ -156,3 +156,42 @@ html { scroll-padding-top: 80px; }
 .site-foot button:hover, .site-foot a:hover { color: #fff; text-decoration: none; }
 .copy { border-top: 1px solid rgba(255, 255, 255, .08); padding-top: 20px; padding-bottom: 28px; font-size: .8rem; }
 @media (max-width: 760px) { .foot-grid { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- hero quote form (replaces the old footer position) ---------- */
+.hero-site { position: relative; }
+.hero-grid { position: relative; z-index: 1; grid-template-columns: 1fr minmax(360px, 440px); align-items: start; }
+.hero-deco { position: absolute; left: -60px; bottom: -70px; width: 520px; opacity: .1; pointer-events: none; }
+.hero-deco svg { width: 100%; height: auto; }
+.hero-form { background: #fff; border-radius: 22px; box-shadow: 0 30px 70px rgba(0, 0, 0, .4); color: var(--s-text); overflow: hidden; }
+.hero-form-head { padding: 18px 22px 14px; background: linear-gradient(135deg, #fff7e6, #fff); border-bottom: 1px solid var(--s-line); }
+.hero-form-head b { display: block; font-size: 1.12rem; color: var(--s-ink); letter-spacing: -.01em; } .hero-form-head span { font-size: .82rem; color: var(--s-muted); }
+.hero-form .card { border: 0; box-shadow: none; background: transparent; }
+.enq-compact { padding: 16px 22px 22px; gap: 12px; } .enq-compact .form-grid { gap: 12px; }
+.enq-compact input, .enq-compact select { min-height: 38px; padding: 7px 11px; }
+.more-link { background: none; border: 0; text-align: left; padding: 0; color: var(--s-sun-dark); font-weight: 650; font-size: .85rem; cursor: pointer; }
+.more-link:hover { text-decoration: underline; }
+.enq-compact .btn { background: linear-gradient(180deg, #fbbf24, #f59e0b); color: #1c1203; border: 0; font-weight: 700; box-shadow: 0 8px 20px rgba(245, 158, 11, .35); min-height: 44px; }
+.enq-compact .btn:hover { background: linear-gradient(180deg, #fcd34d, #f59e0b); color: #1c1203; }
+@media (max-width: 960px) { .hero-grid { grid-template-columns: 1fr; } .hero-deco { display: none; } }
+
+/* closing call-to-action band */
+.cta-band { background: radial-gradient(800px 300px at 0% 0%, rgba(251, 191, 36, .2), transparent), linear-gradient(160deg, var(--s-navy), var(--s-navy-2)); padding: 56px 0; }
+.cta-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.cta-row h2 { color: #fff; font-size: clamp(1.5rem, 3vw, 2.1rem); margin: 0 0 6px; } .cta-row p { margin: 0; color: #b6c2d9; max-width: 520px; }
+
+/* ---------- savings calculator: typed amount, size chips, richer results ---------- */
+.bill-box { display: flex; align-items: center; gap: 6px; border: 2px solid var(--s-line); border-radius: 16px; padding: 4px 18px; background: #fff; transition: border-color .15s, box-shadow .15s; }
+.bill-box:focus-within { border-color: var(--s-sun); box-shadow: 0 0 0 4px rgba(245, 158, 11, .2); }
+.bill-box span { font-size: 2rem; font-weight: 800; color: var(--s-muted); }
+.bill-box input { border: 0; box-shadow: none; background: transparent; font-size: 2.4rem; font-weight: 800; color: var(--s-ink); letter-spacing: -.03em; padding: 6px 0; min-height: 0; width: 100%; }
+.bill-box input:focus { outline: none; box-shadow: none; }
+.calc .bill { display: none; }
+.kw-pick { margin-top: 10px; } .kw-pick > span { display: block; font-weight: 650; color: var(--s-ink); margin-bottom: 8px; }
+.kw-pick div { display: flex; gap: 8px; flex-wrap: wrap; }
+.kw-pick button { position: relative; padding: 9px 16px; border: 1px solid var(--s-line); border-radius: 12px; background: #fff; font-weight: 700; color: var(--s-text); cursor: pointer; }
+.kw-pick button:hover { border-color: var(--s-sun); }
+.kw-pick button.on { background: #fff7e6; border-color: var(--s-sun); color: var(--s-sun-dark); box-shadow: 0 0 0 3px rgba(245, 158, 11, .18); }
+.kw-pick button i { position: absolute; top: -9px; right: -4px; font-style: normal; font-size: .6rem; font-weight: 700; background: #16a34a; color: #fff; padding: 2px 6px; border-radius: 999px; }
+.calc-note { margin: 4px 0 0; padding: 10px 12px; border-radius: 10px; background: #fffbeb; color: #92400e; line-height: 1.5; }
+.kpi .inl { display: inline; font-size: .75rem; font-weight: 500; margin: 0 0 0 4px; color: #9fb0d0; }
+.calc-in { gap: 12px; } .calc-in .s-btn { margin-top: 6px; }

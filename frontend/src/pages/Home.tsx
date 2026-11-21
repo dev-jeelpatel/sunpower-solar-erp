@@ -61,17 +61,35 @@ function Nav() {
   );
 }
 
-function Hero() {
+type QuotePick = { kw: string; type: string };
+
+function Hero({ sel }: { sel: QuotePick }) {
   return (
     <section className="hero-site">
+      <div className="hero-deco" aria-hidden="true">
+        <svg viewBox="0 0 420 360">
+          <defs>
+            <radialGradient id="sg" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#fde68a" /><stop offset="1" stopColor="#f59e0b" /></radialGradient>
+            <linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1e3a8a" /><stop offset="1" stopColor="#0f1f4d" /></linearGradient>
+          </defs>
+          <circle cx="320" cy="80" r="46" fill="url(#sg)" />
+          <g stroke="#fbbf24" strokeWidth="5" strokeLinecap="round">{[0, 45, 90, 135, 180, 225, 270, 315].map((a) => <line key={a} x1={320 + Math.cos((a * Math.PI) / 180) * 62} y1={80 + Math.sin((a * Math.PI) / 180) * 62} x2={320 + Math.cos((a * Math.PI) / 180) * 80} y2={80 + Math.sin((a * Math.PI) / 180) * 80} />)}</g>
+          <path d="M40 330 L40 200 L190 120 L340 200 L340 330 Z" fill="#e2e8f0" />
+          <path d="M20 205 L190 112 L360 205 L330 215 L190 138 L50 215 Z" fill="#334155" />
+          <g transform="translate(86 150) skewY(-28)">
+            {[0, 1, 2].map((r) => [0, 1, 2].map((c) => <rect key={`${r}${c}`} x={c * 38} y={r * 30} width="34" height="26" rx="2" fill="url(#pg)" stroke="#93c5fd" strokeWidth="1" />))}
+          </g>
+          <rect x="150" y="250" width="60" height="80" rx="4" fill="#94a3b8" /><rect x="64" y="240" width="48" height="40" rx="3" fill="#bfdbfe" /><rect x="264" y="240" width="48" height="40" rx="3" fill="#bfdbfe" />
+        </svg>
+      </div>
       <div className="wrap hero-grid">
         <div>
           <span className="eyebrow">Rooftop solar for Indian homes</span>
           <h1>Turn your roof into a <em>power plant</em>. Cut your electricity bill.</h1>
           <p className="lead">From the first call to a 20-year warranty, SunPower looks after everything: roof survey, clear quote, installation, government subsidy paperwork and after-sales support.</p>
           <div className="row" style={{ gap: 12 }}>
-            <button className="s-btn primary" onClick={() => scrollTo('quote')}>Get a free quote</button>
             <button className="s-btn ghost" onClick={() => scrollTo('savings')}>Calculate my savings</button>
+            <button className="s-btn ghost" onClick={() => scrollTo('how')}>See how it works</button>
           </div>
           <ul className="ticks">
             <li><Ico n="check" /> 20-year warranty on panels</li>
@@ -79,23 +97,9 @@ function Hero() {
             <li><Ico n="check" /> Every part tracked by serial number</li>
           </ul>
         </div>
-        <div className="hero-art" aria-hidden="true">
-          <svg viewBox="0 0 420 360">
-            <defs>
-              <radialGradient id="sg" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#fde68a" /><stop offset="1" stopColor="#f59e0b" /></radialGradient>
-              <linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1e3a8a" /><stop offset="1" stopColor="#0f1f4d" /></linearGradient>
-            </defs>
-            <circle cx="320" cy="80" r="46" fill="url(#sg)" />
-            <g stroke="#fbbf24" strokeWidth="5" strokeLinecap="round">{[0, 45, 90, 135, 180, 225, 270, 315].map((a) => <line key={a} x1={320 + Math.cos((a * Math.PI) / 180) * 62} y1={80 + Math.sin((a * Math.PI) / 180) * 62} x2={320 + Math.cos((a * Math.PI) / 180) * 80} y2={80 + Math.sin((a * Math.PI) / 180) * 80} />)}</g>
-            <path d="M40 330 L40 200 L190 120 L340 200 L340 330 Z" fill="#e2e8f0" />
-            <path d="M20 205 L190 112 L360 205 L330 215 L190 138 L50 215 Z" fill="#334155" />
-            <g transform="translate(86 150) skewY(-28)">
-              {[0, 1, 2].map((r) => [0, 1, 2].map((c) => <rect key={`${r}${c}`} x={c * 38} y={r * 30 + c * 0} width="34" height="26" rx="2" fill="url(#pg)" stroke="#93c5fd" strokeWidth="1" />))}
-            </g>
-            <rect x="150" y="250" width="60" height="80" rx="4" fill="#94a3b8" /><rect x="64" y="240" width="48" height="40" rx="3" fill="#bfdbfe" /><rect x="264" y="240" width="48" height="40" rx="3" fill="#bfdbfe" />
-          </svg>
-          <div className="float f1"><Ico n="bolt" /><span>Clean energy<b>from day one</b></span></div>
-          <div className="float f2"><Ico n="shield" /><span>20-year<b>panel warranty</b></span></div>
+        <div id="quote" className="hero-form">
+          <div className="hero-form-head"><b>Get your free quote</b><span>Free roof survey. No obligation.</span></div>
+          <EnquiryForm key={`${sel.kw}-${sel.type}`} compact initialKw={sel.kw} initialType={sel.type} title="" />
         </div>
       </div>
     </section>
@@ -128,10 +132,9 @@ function How() {
   );
 }
 
-function Solutions() {
+function Solutions({ onPick }: { onPick: (p: QuotePick) => void }) {
   const [pkgs, setPkgs] = useState<Pkg[] | null>(null);
   const [kind, setKind] = useState<'on_grid' | 'off_grid'>('on_grid');
-  const [pick, setPick] = useState<{ kw: string; type: string } | null>(null);
   useEffect(() => { get<Pkg[]>('/public/packages').then(setPkgs).catch(() => setPkgs([])); }, []);
   const list = (pkgs || []).filter((p) => p.kind === kind);
   return (
@@ -157,55 +160,84 @@ function Solutions() {
                 <li><Ico n="check" /> Installation, testing &amp; sign-off</li>
               </ul>
               {kind === 'on_grid' && <div className="sub-note">Subsidy up to <b>{money(subsidyFor(p.capacity_kw))}</b></div>}
-              <button className="s-btn primary block" onClick={() => { setPick({ kw: String(p.capacity_kw), type: p.kind }); scrollTo('quote'); }}>Get this quote</button>
+              <button className="s-btn primary block" onClick={() => { onPick({ kw: String(p.capacity_kw), type: p.kind }); scrollTo('quote'); }}>Get this quote</button>
             </article>
           );
         })}</div>
       )}
-      <PickBridge pick={pick} />
     </div></section>
   );
 }
 
-// The quote form below listens for "Get this quote" clicks.
-function PickBridge({ pick }: { pick: { kw: string; type: string } | null }) {
-  useEffect(() => { if (pick) window.dispatchEvent(new CustomEvent('sp-pick', { detail: pick })); }, [pick]);
-  return null;
-}
+const MIN_BILL = 500;
+const MAX_BILL = 30000;
 
-function Savings() {
+function Savings({ onPick }: { onPick: (p: QuotePick) => void }) {
   const [bill, setBill] = useState(4000);
+  const [text, setText] = useState('4000'); // what is typed in the box (may be mid-edit)
+  const [chosenKw, setChosenKw] = useState<number | null>(null); // null = use our recommendation
   const [pkgs, setPkgs] = useState<Pkg[]>([]);
   useEffect(() => { get<Pkg[]>('/public/packages').then(setPkgs).catch(() => undefined); }, []);
+
+  const setAmount = (n: number) => { const v = Math.min(MAX_BILL, Math.max(MIN_BILL, Math.round(n))); setBill(v); setText(String(v)); };
+
   const r = useMemo(() => {
-    const units = bill / TARIFF;
-    const kw = Math.min(5, Math.max(1, Math.ceil(units / UNITS_PER_KW_MONTH)));
-    const gen = kw * UNITS_PER_KW_MONTH;
-    const monthly = Math.min(bill, Math.round(gen * TARIFF));
+    const units = bill / TARIFF; // units used each month
+    const needKw = Math.max(1, Math.ceil(units / UNITS_PER_KW_MONTH)); // size that would cover the whole bill
+    const recommended = Math.min(5, needKw);
+    const kw = chosenKw ?? recommended;
+    const generated = kw * UNITS_PER_KW_MONTH; // units the system makes each month
+    const monthly = Math.min(bill, Math.round(generated * TARIFF));
+    const after = bill - monthly;
+    const covered = Math.min(100, Math.round((monthly / bill) * 100));
     const pkg = pkgs.find((p) => p.kind === 'on_grid' && p.capacity_kw === kw);
     const price = pkg ? Math.round(pkg.list_price * (1 + GST)) : null;
     const subsidy = subsidyFor(kw);
-    const net = price ? price - subsidy : null;
+    const net = price ? Math.max(0, price - subsidy) : null;
     const payback = net && monthly ? net / (monthly * 12) : null;
-    return { kw, gen, monthly, yearly: monthly * 12, price, subsidy, net, payback };
-  }, [bill, pkgs]);
+    return { recommended, needKw, kw, generated, monthly, after, covered, yearly: monthly * 12, twentyFive: monthly * 12 * 25, price, subsidy, net, payback };
+  }, [bill, chosenKw, pkgs]);
+
   return (
     <section id="savings" className="sec"><div className="wrap">
-      <Head eyebrow="Savings calculator" title="See what solar could save you" sub={`A quick estimate. It assumes about ₹${TARIFF} per unit and ${UNITS_PER_KW_MONTH} units a month from each kW. Your survey gives the exact figure.`} />
+      <Head eyebrow="Savings calculator" title="See what solar could save you" sub={`Enter your monthly bill and pick a system size. It assumes about ₹${TARIFF} per unit and ${UNITS_PER_KW_MONTH} units a month from each kW. Your roof survey gives the exact figure.`} />
       <div className="calc">
         <div className="calc-in">
-          <label htmlFor="bill">Your average monthly electricity bill</label>
-          <div className="bill">{money(bill)}</div>
-          <input id="bill" type="range" min={1000} max={20000} step={500} value={bill} onChange={(e) => setBill(Number(e.target.value))} />
-          <div className="range-lab"><span>₹1,000</span><span>₹20,000</span></div>
-          <p className="small muted">Recommended size: <b>{r.kw} kW</b> on-grid system</p>
-          <button className="s-btn primary" onClick={() => scrollTo('quote')}>Get an exact quote</button>
+          <label htmlFor="bill-num">Your average monthly electricity bill</label>
+          <div className="bill-box">
+            <span>₹</span>
+            <input
+              id="bill-num" inputMode="numeric" value={text}
+              onChange={(e) => { const t = e.target.value.replace(/[^\d]/g, '').slice(0, 5); setText(t); if (t) setBill(Math.min(MAX_BILL, Math.max(MIN_BILL, Number(t)))); }}
+              onBlur={() => setAmount(Number(text) || MIN_BILL)}
+              aria-label="Monthly bill in rupees"
+            />
+          </div>
+          <input type="range" min={MIN_BILL} max={MAX_BILL} step={250} value={bill} onChange={(e) => setAmount(Number(e.target.value))} aria-label="Monthly bill slider" />
+          <div className="range-lab"><span>{money(MIN_BILL)}</span><span>{money(MAX_BILL)}</span></div>
+
+          <div className="kw-pick">
+            <span>System size</span>
+            <div role="group" aria-label="System size">
+              {[1, 2, 3, 4, 5].map((k) => (
+                <button key={k} type="button" className={r.kw === k ? 'on' : ''} onClick={() => setChosenKw(k === r.recommended && chosenKw === null ? null : k)}>
+                  {k} kW{k === r.recommended && <i>best fit</i>}
+                </button>
+              ))}
+            </div>
+          </div>
+          {r.needKw > 5 && <p className="small calc-note">Your bill needs about {r.needKw} kW to cover fully. Our largest home system is 5 kW, so it covers {r.covered}% of this bill.</p>}
+          {r.needKw <= 5 && r.kw < r.needKw && <p className="small calc-note">A {r.needKw} kW system would cover your whole bill. {r.kw} kW covers about {r.covered}%.</p>}
+          <button className="s-btn primary" onClick={() => { onPick({ kw: String(r.kw), type: 'on_grid' }); scrollTo('quote'); }}>Get an exact quote for {r.kw} kW</button>
         </div>
         <div className="calc-out">
-          <div className="kpi"><span>Bill saved each month</span><b>{money(r.monthly)}</b></div>
-          <div className="kpi"><span>Saved each year</span><b>{money(r.yearly)}</b></div>
-          <div className="kpi"><span>Government subsidy</span><b>{money(r.subsidy)}</b></div>
-          <div className="kpi hi"><span>Estimated payback</span><b>{r.payback ? `${r.payback.toFixed(1)} years` : '-'}</b>{r.net != null && <small>after subsidy, on {money(r.net)} net cost</small>}</div>
+          <div className="kpi"><span>Your bill today</span><b>{money(bill)}<small className="inl"> /month</small></b></div>
+          <div className="kpi"><span>Bill after solar</span><b>{money(r.after)}<small className="inl"> /month</small></b></div>
+          <div className="kpi"><span>You save each month</span><b>{money(r.monthly)}</b><small>{r.covered}% of your bill covered</small></div>
+          <div className="kpi"><span>You save each year</span><b>{money(r.yearly)}</b><small>about {money(r.twentyFive)} over 25 years</small></div>
+          <div className="kpi"><span>Government subsidy</span><b>{money(r.subsidy)}</b><small>on a {r.kw} kW on-grid system</small></div>
+          <div className="kpi"><span>System generates</span><b>{r.generated}<small className="inl"> units/month</small></b></div>
+          <div className="kpi hi"><span>Estimated payback</span><b>{r.payback ? `${r.payback.toFixed(1)} years` : '-'}</b>{r.net != null && r.price != null && <small>{money(r.price)} system − {money(r.subsidy)} subsidy = {money(r.net)} net cost</small>}</div>
         </div>
       </div>
     </div></section>
@@ -310,24 +342,14 @@ function Faq() {
   );
 }
 
-function Quote() {
-  const [sel, setSel] = useState<{ kw: string; type: string }>({ kw: '3', type: 'on_grid' });
-  useEffect(() => {
-    const h = (e: Event) => setSel((e as CustomEvent).detail);
-    window.addEventListener('sp-pick', h);
-    return () => window.removeEventListener('sp-pick', h);
-  }, []);
+function CtaBand() {
   return (
-    <section id="quote" className="sec cta-band"><div className="wrap two">
+    <section className="cta-band"><div className="wrap cta-row">
       <div>
-        <Head left light eyebrow="Get started" title="Get your free quote" sub="Share a few details. A solar advisor will call you, arrange a free roof survey and send an itemised quote." />
-        <ul className="ticks">
-          <li><Ico n="check" /> No cost and no obligation</li>
-          <li><Ico n="check" /> Reply from a real advisor</li>
-          <li><Ico n="check" /> Your details are used only to prepare your quote</li>
-        </ul>
+        <h2>Ready to switch to solar?</h2>
+        <p>Get a free roof survey and an itemised quote from a real advisor. No cost, no obligation.</p>
       </div>
-      <div className="form-card"><EnquiryForm key={`${sel.kw}-${sel.type}`} initialKw={sel.kw} initialType={sel.type} title="Request a free quote" /></div>
+      <button className="s-btn primary" onClick={() => scrollTo('quote')}>Get my free quote</button>
     </div></section>
   );
 }
@@ -356,20 +378,21 @@ function Head({ eyebrow, title, sub, left, light }: { eyebrow: string; title: Re
 }
 
 export default function Home() {
+  const [sel, setSel] = useState<QuotePick>({ kw: '3', type: 'on_grid' });
   useEffect(() => { document.title = 'SunPower Solutions | Rooftop solar for your home'; return () => { document.title = 'SunPower Solar ERP'; }; }, []);
   return (
     <div className="site">
       <Nav />
-      <Hero />
+      <Hero sel={sel} />
       <Facts />
       <How />
-      <Solutions />
-      <Savings />
+      <Solutions onPick={setSel} />
+      <Savings onPick={setSel} />
       <Subsidy />
       <Why />
       <Warranty />
       <Faq />
-      <Quote />
+      <CtaBand />
       <Footer />
     </div>
   );
