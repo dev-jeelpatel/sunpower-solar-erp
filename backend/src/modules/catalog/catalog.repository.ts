@@ -7,7 +7,7 @@ export const catalogRepository = {
   products: (category: string | null, search: string | null) =>
     q(
       prisma,
-      `SELECT * FROM v_stock WHERE ($1::text IS NULL OR category::text = $1) AND ($2::text IS NULL OR name ILIKE $2 OR sku ILIKE $2)
+      `SELECT * FROM v_stock WHERE active AND ($1::text IS NULL OR category::text = $1) AND ($2::text IS NULL OR name ILIKE $2 OR sku ILIKE $2)
         ORDER BY category, name`,
       [category, search ? `%${search}%` : null],
     ),
@@ -56,4 +56,26 @@ export const catalogRepository = {
     ),
 
   deactivatePackage: (id: number) => exec(prisma, 'UPDATE packages SET active = FALSE WHERE id = $1', [id]),
+
+  productExists: (id: number) => q1(prisma, 'SELECT id FROM products WHERE id = $1', [id]),
+
+  productUse: (id: number) =>
+    q1<{ in_packages: string | null; has_history: boolean }>(
+      prisma,
+      `SELECT (SELECT string_agg(pk.name, ', ') FROM package_items pi JOIN packages pk ON pk.id = pi.package_id WHERE pi.product_id = $1 AND pk.active) AS in_packages,
+              (EXISTS (SELECT 1 FROM package_items WHERE product_id = $1) OR EXISTS (SELECT 1 FROM quote_items WHERE product_id = $1)
+               OR EXISTS (SELECT 1 FROM order_items WHERE product_id = $1) OR EXISTS (SELECT 1 FROM purchase_order_items WHERE product_id = $1)
+               OR EXISTS (SELECT 1 FROM stock_movements WHERE product_id = $1) OR EXISTS (SELECT 1 FROM inventory_units WHERE product_id = $1)
+               OR EXISTS (SELECT 1 FROM ticket_lines WHERE product_id = $1)) AS has_history`,
+      [id],
+    ),
+
+  deleteProduct: (id: number) => exec(prisma, 'DELETE FROM products WHERE id = $1', [id]),
+  hideProduct: (id: number) => exec(prisma, 'UPDATE products SET active = FALSE WHERE id = $1', [id]),
+
+  updatePackage: (db: Db, id: number, p: PackageInput) =>
+    q1(db, 'UPDATE packages SET name=$2, kind=$3::package_kind, capacity_kw=$4, description=$5 WHERE id=$1 AND active RETURNING *', [
+      id, p.name, p.kind, p.capacityKw ?? null, p.description ?? null,
+    ]),
+  clearPackageItems: (db: Db, id: number) => exec(db, 'DELETE FROM package_items WHERE package_id = $1', [id]),
 };

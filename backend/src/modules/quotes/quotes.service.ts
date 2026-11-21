@@ -70,4 +70,14 @@ export const quotesService = {
 
   /** Customer says yes: quote -> order + invoice (+ subsidy file when requested). */
   accept: (id: number, userId: number) => ordersService.createFromQuote(id, userId),
+
+  /** Drafts and declined quotes can be thrown away. Sent or accepted ones are records and stay. */
+  async remove(id: number, userId: number) {
+    const cur = await repo.find(id);
+    if (!cur) throw notFound('Quote');
+    if (!['draft', 'rejected'].includes(cur.status)) throw unprocessable('Only a draft or declined quote can be deleted');
+    await repo.remove(id);
+    await logActivity(prisma, 'enquiry', cur.enquiry_id, 'quote_deleted', userId, { quoteNo: cur.quote_no });
+    return { ok: true };
+  },
 };

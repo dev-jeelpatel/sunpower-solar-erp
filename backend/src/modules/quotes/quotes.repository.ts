@@ -68,4 +68,7 @@ export const quotesRepository = {
       [id, to, from],
     ),
   statusOf: (db: Db, id: number) => q1<{ status: string }>(db, 'SELECT status FROM quotes WHERE id = $1', [id]),
+
+  find: (id: number) => q1<{ status: string; enquiry_id: number; quote_no: string }>(prisma, 'SELECT status, enquiry_id, quote_no FROM quotes WHERE id = $1', [id]),
+  remove: (id: number) => exec(prisma, 'DELETE FROM quotes WHERE id = $1', [id]),
 };

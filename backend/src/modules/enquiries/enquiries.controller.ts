@@ -20,4 +20,6 @@ export const enquiriesController = {
   get: wrap(async (req, res) => res.json(await enquiriesService.get(idOf(req)))),
   qualify: wrap(async (req, res) => res.json(await enquiriesService.qualify(idOf(req), req.body, req.user.id))),
   assign: wrap(async (req, res) => res.json(await enquiriesService.assign(idOf(req), req.body.assignedTo, req.user.id))),
+  update: wrap(async (req, res) => res.json(await enquiriesService.update(idOf(req), req.body, req.user.id))),
+  remove: wrap(async (req, res) => res.json(await enquiriesService.remove(idOf(req)))),
 };

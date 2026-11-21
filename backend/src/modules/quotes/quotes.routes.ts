@@ -13,3 +13,4 @@ quotesRouter.post('/', authorize('sales'), validate(createQuoteSchema), c.create
 quotesRouter.post('/:id/send', authorize('sales'), validate(idParam, 'params'), c.send);
 quotesRouter.post('/:id/reject', authorize('sales'), validate(idParam, 'params'), c.reject);
 quotesRouter.post('/:id/accept', authorize('sales'), validate(idParam, 'params'), c.accept);
+quotesRouter.delete('/:id', authorize('sales'), validate(idParam, 'params'), c.remove);

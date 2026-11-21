@@ -23,5 +23,7 @@ enquiriesRouter.use(authenticate);
 enquiriesRouter.get('/', c.list);
 enquiriesRouter.post('/', authorize('sales'), validate(staffEnquirySchema), c.create);
 enquiriesRouter.get('/:id', validate(idParam, 'params'), c.get);
+enquiriesRouter.put('/:id', authorize('sales'), validate(idParam, 'params'), validate(enquirySchema), c.update);
+enquiriesRouter.delete('/:id', authorize('sales'), validate(idParam, 'params'), c.remove);
 enquiriesRouter.post('/:id/qualify', authorize('sales'), validate(idParam, 'params'), validate(qualifySchema), c.qualify);
 enquiriesRouter.post('/:id/assign', authorize('sales'), validate(idParam, 'params'), validate(assignSchema), c.assign);

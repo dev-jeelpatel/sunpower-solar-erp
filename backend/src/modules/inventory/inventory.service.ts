@@ -1,7 +1,7 @@
-import { notFound, unprocessable } from '../../lib/errors';
+import { conflict, notFound, unprocessable } from '../../lib/errors';
 import { logActivity, tx } from '../../lib/prisma';
 import { inventoryRepository as repo } from './inventory.repository';
-import type { PoInput, ReceiveInput, SupplierInput } from './inventory.schema';
+import type { AddUnitsInput, PoInput, ReceiveInput, SupplierInput } from './inventory.schema';
 
 export const inventoryService = {
   stock: repo.stock,
@@ -62,4 +62,68 @@ export const inventoryService = {
       return { ok: true };
     });
   },
+
+  async updateSupplier(id: number, s: SupplierInput) {
+    let row;
+    try {
+      row = await repo.updateSupplier(id, s);
+    } catch (e) {
+      if (e instanceof Error && /unique|duplicate/i.test(e.message)) throw conflict('A supplier with this name already exists', { name: 'Name already in use' });
+      throw e;
+    }
+    if (!row) throw notFound('Supplier');
+    return row;
+  },
+
+  async removeSupplier(id: number) {
+    if ((await repo.supplierPoCount(id)) > 0) throw unprocessable('This supplier has purchase orders, so it cannot be deleted');
+    if (!(await repo.deleteSupplier(id))) throw notFound('Supplier');
+  },
+
+  cancelPurchase: (poId: number, userId: number) =>
+    tx(async (db) => {
+      const po = await repo.lockPurchase(db, poId);
+      if (!po) throw notFound('Purchase order');
+      if (po.status !== 'ordered') throw unprocessable(`Only an open purchase order can be cancelled (this one is ${po.status})`);
+      await repo.markCancelled(db, poId);
+      await logActivity(db, 'purchase_order', poId, 'cancelled', userId);
+      return { ok: true };
+    }),
+
+  /** Add loose units to stock by hand (found stock, opening balance). Each one is also written to the stock ledger. */
+  addUnits: (d: AddUnitsInput, userId: number) =>
+    tx(async (db) => {
+      const p = await repo.productForUnits(db, d.productId);
+      if (!p || !p.active) throw notFound('Product');
+      if (!p.tracked_serial) throw unprocessable('This product is counted by quantity, not by serial number', { productId: 'Not a serial-numbered product' });
+      if (new Set(d.serials).size !== d.serials.length) throw unprocessable('Duplicate serial numbers in the list', { serials: 'Remove the repeated serials' });
+      const dup = await repo.existingSerials(db, d.serials);
+      if (dup.length) throw unprocessable(`Serial already exists: ${dup.map((r) => r.serial_no).join(', ')}`, { serials: 'Already in the system' });
+      for (const s of d.serials) await repo.insertLooseUnit(db, p.id, s);
+      await repo.adjust(db, p.id, d.serials.length, null, userId);
+      await logActivity(db, 'product', p.id, 'units_added', userId, { count: d.serials.length });
+      return { added: d.serials.length };
+    }),
+
+  renameUnit: (id: number, serial: string, userId: number) =>
+    tx(async (db) => {
+      const u = await repo.lockUnit(db, id);
+      if (!u) throw notFound('Unit');
+      if (u.status !== 'in_stock') throw unprocessable('Only units still in stock can be renamed');
+      if (u.serial_no !== serial && (await repo.existingSerials(db, [serial])).length) throw conflict('This serial already exists', { serial: 'Already in the system' });
+      await repo.renameUnit(db, id, serial);
+      await logActivity(db, 'unit', id, 'renamed', userId, { from: u.serial_no, to: serial });
+      return { ok: true };
+    }),
+
+  removeUnit: (id: number, userId: number) =>
+    tx(async (db) => {
+      const u = await repo.lockUnit(db, id);
+      if (!u) throw notFound('Unit');
+      if (u.status !== 'in_stock') throw unprocessable('Only units still in stock can be deleted. This one has already left the warehouse');
+      await repo.deleteUnit(db, id);
+      await repo.adjust(db, u.product_id, -1, null, userId);
+      await logActivity(db, 'unit', id, 'deleted', userId, { serial: u.serial_no });
+      return { ok: true };
+    }),
 };

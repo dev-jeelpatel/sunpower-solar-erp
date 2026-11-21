@@ -7,6 +7,14 @@ export const supplierSchema = z.object({
 });
 export type SupplierInput = z.infer<typeof supplierSchema>;
 
+export const addUnitsSchema = z.object({
+  productId: id('Product'),
+  serials: z.array(serial).min(1, 'Enter at least one serial number').max(500),
+});
+export type AddUnitsInput = z.infer<typeof addUnitsSchema>;
+
+export const renameUnitSchema = z.object({ serial });
+
 export const poSchema = z.object({
   supplierId: id('Supplier'),
   items: z

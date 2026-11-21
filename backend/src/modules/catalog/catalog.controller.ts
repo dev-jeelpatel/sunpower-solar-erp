@@ -11,4 +11,6 @@ export const catalogController = {
     await catalogService.removePackage(idOf(req));
     res.status(204).end();
   }),
+  removeProduct: wrap(async (req, res) => res.json(await catalogService.removeProduct(idOf(req)))),
+  updatePackage: wrap(async (req, res) => res.json(await catalogService.updatePackage(idOf(req), req.body))),
 };

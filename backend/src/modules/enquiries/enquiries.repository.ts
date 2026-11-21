@@ -79,5 +79,19 @@ export const enquiriesRepository = {
     const rows = await q(prisma, 'UPDATE enquiries SET assigned_to = $2 WHERE id = $1 RETURNING *', [id, userId]);
     return rows[0];
   },
+
+  update: (db: Db, id: number, d: EnquiryInput) =>
+    q1(
+      db,
+      `UPDATE enquiries SET customer_name=$2, phone=$3, email=$4, address=$5, city=$6, requested_kw=$7, system_type=$8::system_type, subsidy_required=$9, message=$10
+        WHERE id=$1 RETURNING *`,
+      [id, d.name, d.phone, d.email ?? null, d.address, d.city ?? null, d.requestedKw, d.systemType, d.subsidyRequired ?? false, d.message ?? null],
+    ),
+  quoteCount: async (db: Db, id: number) => (await q1<{ n: number }>(db, 'SELECT count(*) AS n FROM quotes WHERE enquiry_id = $1', [id]))?.n ?? 0,
+  lockForDelete: (db: Db, id: number) => q1<{ status: string; customer_id: number | null }>(db, 'SELECT status, customer_id FROM enquiries WHERE id = $1 FOR UPDATE', [id]),
+  remove: async (db: Db, id: number) => {
+    await exec(db, `DELETE FROM activity_log WHERE entity = 'enquiry' AND entity_id = $1`, [id]);
+    await exec(db, 'DELETE FROM enquiries WHERE id = $1', [id]);
+  },
 };
 void exec;

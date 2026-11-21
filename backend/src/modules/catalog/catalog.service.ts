@@ -1,4 +1,4 @@
-import { conflict, notFound } from '../../lib/errors';
+import { conflict, notFound, unprocessable } from '../../lib/errors';
 import { tx } from '../../lib/prisma';
 import { catalogRepository as repo } from './catalog.repository';
 import type { PackageInput, ProductInput } from './catalog.schema';
@@ -40,4 +40,26 @@ export const catalogService = {
   async removePackage(id: number) {
     if (!(await repo.deactivatePackage(id))) throw notFound('Package');
   },
+
+  /** Delete a product that was never used; hide one that has history (so old quotes and invoices stay intact). */
+  async removeProduct(id: number) {
+    if (!(await repo.productExists(id))) throw notFound('Product');
+    const use = await repo.productUse(id);
+    if (use?.in_packages) throw unprocessable(`This product is part of: ${use.in_packages}. Remove it from those packages first`);
+    if (use?.has_history) {
+      await repo.hideProduct(id);
+      return { deleted: false, hidden: true };
+    }
+    await repo.deleteProduct(id);
+    return { deleted: true, hidden: false };
+  },
+
+  updatePackage: (id: number, p: PackageInput) =>
+    tx(async (db) => {
+      const pkg = await repo.updatePackage(db, id, p);
+      if (!pkg) throw notFound('Package');
+      await repo.clearPackageItems(db, id);
+      for (const it of p.items) await repo.upsertPackageItem(db, id, it.productId, it.quantity);
+      return pkg;
+    }),
 };

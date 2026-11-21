@@ -61,4 +61,26 @@ export const enquiriesService = {
     await logActivity(prisma, 'enquiry', id, 'reassigned', actorId, { to: userId });
     return row;
   },
+
+  /** Fix typos or changed details. A won enquiry is locked because an order was built from it. */
+  update: (id: number, d: EnquiryInput, userId: number) =>
+    tx(async (db) => {
+      const cur = await repo.lockStatus(db, id);
+      if (!cur) throw notFound('Enquiry');
+      if (cur.status === 'won') throw unprocessable('This enquiry already became an order and can no longer be edited');
+      const row = await repo.update(db, id, d);
+      await logActivity(db, 'enquiry', id, 'edited', userId);
+      return row;
+    }),
+
+  /** Delete spam or duplicates. Not allowed once a quote exists (the quote is a document we must keep). */
+  remove: (id: number) =>
+    tx(async (db) => {
+      const cur = await repo.lockForDelete(db, id);
+      if (!cur) throw notFound('Enquiry');
+      if (cur.customer_id || cur.status === 'won') throw unprocessable('This enquiry became an order, so it cannot be deleted');
+      if ((await repo.quoteCount(db, id)) > 0) throw unprocessable('This enquiry has quotes, so it cannot be deleted. Mark it as lost instead');
+      await repo.remove(db, id);
+      return { ok: true };
+    }),
 };

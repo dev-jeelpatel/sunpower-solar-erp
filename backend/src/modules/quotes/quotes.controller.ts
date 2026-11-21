@@ -12,4 +12,5 @@ export const quotesController = {
   send: wrap(async (req, res) => res.json(await quotesService.send(idOf(req), req.user.id))),
   reject: wrap(async (req, res) => res.json(await quotesService.reject(idOf(req), req.user.id))),
   accept: wrap(async (req, res) => res.status(201).json(await quotesService.accept(idOf(req), req.user.id))),
+  remove: wrap(async (req, res) => res.json(await quotesService.remove(idOf(req), req.user.id))),
 };

@@ -105,4 +105,19 @@ export const inventoryRepository = {
     ),
 
   markReceived: (db: Db, poId: number) => exec(db, `UPDATE purchase_orders SET status = 'received', received_at = now() WHERE id = $1`, [poId]),
+
+  updateSupplier: (id: number, s: SupplierInput) =>
+    q1(prisma, 'UPDATE suppliers SET name=$2, phone=$3, email=$4 WHERE id=$1 RETURNING *', [id, s.name, s.phone ?? null, s.email ?? null]),
+  supplierPoCount: async (id: number) => (await q1<{ n: number }>(prisma, 'SELECT count(*) AS n FROM purchase_orders WHERE supplier_id = $1', [id]))?.n ?? 0,
+  deleteSupplier: (id: number) => exec(prisma, 'DELETE FROM suppliers WHERE id = $1', [id]),
+
+  markCancelled: (db: Db, poId: number) => exec(db, `UPDATE purchase_orders SET status = 'cancelled' WHERE id = $1`, [poId]),
+
+  productForUnits: (db: Db, id: number) => q1<{ id: number; sku: string; tracked_serial: boolean; active: boolean }>(db, 'SELECT id, sku, tracked_serial, active FROM products WHERE id = $1', [id]),
+  insertLooseUnit: (db: Db, productId: number, serial: string) => exec(db, 'INSERT INTO inventory_units (product_id, serial_no) VALUES ($1,$2)', [productId, serial]),
+  adjust: (db: Db, productId: number, qty: number, unitId: number | null, userId: number) =>
+    exec(db, `INSERT INTO stock_movements (product_id, qty, reason, ref_type, ref_id, created_by) VALUES ($1,$2,'adjustment'::movement_reason,'unit',$3,$4)`, [productId, qty, unitId, userId]),
+  lockUnit: (db: Db, id: number) => q1<{ id: number; product_id: number; serial_no: string; status: string }>(db, 'SELECT * FROM inventory_units WHERE id = $1 FOR UPDATE', [id]),
+  renameUnit: (db: Db, id: number, serial: string) => exec(db, 'UPDATE inventory_units SET serial_no = $2 WHERE id = $1', [id, serial]),
+  deleteUnit: (db: Db, id: number) => exec(db, 'DELETE FROM inventory_units WHERE id = $1', [id]),
 };

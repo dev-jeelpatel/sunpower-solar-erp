@@ -10,6 +10,8 @@ catalogRouter.use(authenticate);
 catalogRouter.get('/products', c.products);
 catalogRouter.post('/products', authorize('warehouse'), validate(productSchema), c.createProduct);
 catalogRouter.put('/products/:id', authorize('warehouse'), validate(idParam, 'params'), validate(productSchema), c.updateProduct);
+catalogRouter.delete('/products/:id', authorize('warehouse'), validate(idParam, 'params'), c.removeProduct);
 catalogRouter.get('/packages', c.packages);
+catalogRouter.put('/packages/:id', authorize(), validate(idParam, 'params'), validate(packageSchema), c.updatePackage);
 catalogRouter.post('/packages', authorize(), validate(packageSchema), c.createPackage);
 catalogRouter.delete('/packages/:id', authorize(), validate(idParam, 'params'), c.removePackage);

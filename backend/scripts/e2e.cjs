@@ -99,11 +99,11 @@ async function login(name) {
   await fails('invalid vehicle number rejected', call('POST', `/dispatches/${disp.id}/dispatch`, { token: tokens.warehouse, body: { vehicleNo: '??' } }), 400);
   await ok('truck dispatched', call('POST', `/dispatches/${disp.id}/dispatch`, { token: tokens.warehouse, body: { vehicleNo: 'GJ05AB1234' } }));
   await ok('delivery confirmed', call('POST', `/dispatches/${disp.id}/deliver`, { token: tokens.warehouse }));
-  const invSerial = scanned.find((s) => s.includes('INV3K'));
+  const invSerial = scanned.find((s) => s.startsWith('INV'));
   const lookup = await ok('warranty lookup by serial', call('GET', `/inventory/units/lookup/${invSerial}`, { token: tokens.support }));
   assert.equal(lookup.warranty_state, 'in_warranty');
   assert.ok(lookup.warranty_end, 'warranty clock started automatically');
-  const panelSerial = scanned.find((s) => s.includes('PNL540'));
+  const panelSerial = scanned.find((s) => s.startsWith('PNL'));
   const pl = await ok('panel lookup', call('GET', `/inventory/units/lookup/${panelSerial}`, { token: tokens.support }));
   assert.ok(new Date(pl.warranty_end).getFullYear() - new Date().getFullYear() >= 19, 'panel warranty ~20 years');
 
@@ -133,8 +133,17 @@ async function login(name) {
   const t1r = await ok('ticket detail', call('GET', `/tickets/${t1.id}`, { token: tokens.support }));
   assert.equal(t1r.invoice, null, 'no invoice for in-warranty repair');
   await ok('customer confirms -> closed', call('POST', `/tickets/${t1.id}/confirm`, { token: tokens.support }));
-  const old = (await ok('serial search', call('GET', '/search?q=BAT150', { token: tokens.support }))).units.find((u) => u.warranty_state === 'expired');
-  assert.ok(old, 'seed has an expired-warranty battery');
+  // the demo data is only a few months old, so age one delivered unit by hand to get an expired warranty
+  const agedSerial = scanned.find((s) => s.startsWith('MC'));
+  {
+    require('dotenv').config({ path: require('node:path').join(__dirname, '..', '.env') });
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    await pool.query("UPDATE inventory_units SET warranty_start = current_date - 800, warranty_end = current_date - 30 WHERE serial_no = $1", [agedSerial]);
+    await pool.end();
+  }
+  const old = (await ok('serial search', call('GET', `/search?q=${agedSerial}`, { token: tokens.support }))).units.find((u) => u.warranty_state === 'expired');
+  assert.ok(old, 'an aged unit shows as expired');
   const t2 = await ok('ticket on expired unit', call('POST', '/tickets', { token: tokens.support, body: { serial: old.serial_no, subject: 'Battery not holding charge' } }), 201);
   assert.equal(t2.warranty_status, 'out_of_warranty');
   await fails('cannot resolve out-of-warranty without billable lines', call('POST', `/tickets/${t2.id}/resolve`, { token: tokens.support, body: { resolution: 'Battery replaced' } }), 422, 'warranty');
