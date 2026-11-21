@@ -4,6 +4,7 @@ import {
 } from 'react';
 import { ApiError } from '../api';
 import type { FieldErrors, Tone } from '../types';
+import { Icon } from './icons';
 
 // ---------- formatting ----------
 const inr = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -80,8 +81,15 @@ export function useAction(setErrors?: (e: FieldErrors) => void) {
 }
 
 // ---------- building blocks ----------
-export const Loading = () => <div className="spinner" aria-label="Loading" />;
-export const Empty = ({ children = 'Nothing here yet.' }: { children?: ReactNode }) => <div className="empty">{children}</div>;
+/** Shimmering placeholder rows instead of a lone spinner. */
+export const Loading = () => (
+  <div className="skel" role="status" aria-label="Loading">
+    <div className="skel-row w40" /><div className="skel-row" /><div className="skel-row" /><div className="skel-row w70" /><div className="skel-row" />
+  </div>
+);
+export const Empty = ({ children = 'Nothing here yet.' }: { children?: ReactNode }) => (
+  <div className="empty"><span className="empty-ic"><Icon n="inbox" /></span><p>{children}</p></div>
+);
 export const ErrorBox = ({ error }: { error?: Error | string | null }) =>
   (error ? <div className="alert bad">{typeof error === 'string' ? error : error.message || String(error)}</div> : null);
 
