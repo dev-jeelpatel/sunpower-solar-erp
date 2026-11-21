@@ -1,3 +1,4 @@
+import ErrorBoundary from './components/ErrorBoundary';
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth';
@@ -42,7 +43,9 @@ function Protected({ children }: { children: JSX.Element }) {
 }
 
 export default function App() {
+  const { pathname } = useLocation();
   return (
+    <ErrorBoundary resetKey={pathname}>
     <Suspense fallback={<Loading />}>
       <Routes>
         <Route path="/home" element={<Home />} />
@@ -77,5 +80,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   );
 }

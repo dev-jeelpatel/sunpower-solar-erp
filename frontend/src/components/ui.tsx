@@ -1,6 +1,6 @@
 import {
   createContext, useCallback, useContext, useEffect, useRef, useState,
-  type ChangeEvent, type ReactNode,
+  type ChangeEvent, type FocusEvent as ReactFocusEvent, type ReactNode,
 } from 'react';
 import { ApiError } from '../api';
 import type { FieldErrors, Tone } from '../types';
@@ -130,14 +130,28 @@ export function Badge({ status, children }: { status?: string | null; children?:
   return <span className={`badge ${tone}`}>{children || label(status)}</span>;
 }
 
-export function Field({ label: l, error, hint, children, className = '', required }: {
+export function Field({ label: l, error, hint, children, className = '', required, rules }: {
   label?: ReactNode; error?: string; hint?: ReactNode; children?: ReactNode; className?: string; required?: boolean;
+  /** Checked when the person leaves the box, so a mistake is flagged straight away, not only on submit. */
+  rules?: Array<(v: any) => string | null | undefined>;
 }) {
+  const [local, setLocal] = useState('');
+  const check = (e: ReactFocusEvent<HTMLElement>) => {
+    if (!rules) return;
+    const t = e.target as HTMLInputElement;
+    if (t.type === 'checkbox' || t.type === 'radio' || typeof t.value !== 'string') return;
+    for (const r of rules) {
+      const m = r(t.value);
+      if (m) { setLocal(m); return; }
+    }
+    setLocal('');
+  };
+  const shown = error || local;
   return (
-    <div className={`field ${error ? 'invalid' : ''} ${className}`}>
+    <div className={`field ${shown ? 'invalid' : ''} ${className}`} onBlurCapture={check} onInputCapture={() => local && setLocal('')}>
       {l && <label>{l}{required && <span style={{ color: 'var(--bad)' }}> *</span>}</label>}
       {children}
-      {error ? <span className="err" role="alert">{error}</span> : hint && <span className="hint">{hint}</span>}
+      {shown ? <span className="err" role="alert">{shown}</span> : hint && <span className="hint">{hint}</span>}
     </div>
   );
 }

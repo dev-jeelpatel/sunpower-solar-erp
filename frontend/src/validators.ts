@@ -61,3 +61,28 @@ export const businessName = (label = 'Name') => (v: any) => {
   if (t.length < 2 || t.length > 120) return `${label} must be 2 to 120 characters`;
   return /^[\p{L}\p{N}][\p{L}\p{N} .,&'()-]*$/u.test(t) ? null : `${label} has characters that are not allowed`;
 };
+
+// ---- more format rules (mirrored on the server) ----
+/** Whole number inside a range. */
+export const wholeNumber = (label: string, min = 0, max = 1000000) => (v: any) => {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  if (Number.isNaN(n)) return `${label} must be a number`;
+  if (!Number.isInteger(n)) return `${label} must be a whole number`;
+  return n < min || n > max ? `${label} must be between ${min.toLocaleString('en-IN')} and ${max.toLocaleString('en-IN')}` : null;
+};
+/** Amount of money: a number, at most two decimals, inside a range. */
+export const moneyAmount = (label: string, min = 0, max = 100000000) => (v: any) => {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  if (Number.isNaN(n)) return `${label} must be a number`;
+  if (!/^\d+(\.\d{1,2})?$/.test(String(v).trim())) return `${label} can have at most two decimal places and no signs`;
+  return n < min || n > max ? `${label} must be between ₹${min.toLocaleString('en-IN')} and ₹${max.toLocaleString('en-IN')}` : null;
+};
+/** Product code: 3 to 30 letters, digits or dashes. */
+export const skuCode = (v: any) => (v && !/^[A-Za-z0-9-]{3,30}$/.test(String(v).trim()) ? 'SKU must be 3 to 30 letters, digits or dashes (e.g. PNL-540)' : null);
+/** Serial number: 6 to 40 letters, digits or dashes. */
+export const serialNo = (v: any) => (v && !/^[A-Za-z0-9][A-Za-z0-9-]{5,39}$/.test(String(v).trim()) ? 'Serial must be 6 to 40 letters, digits or dashes (e.g. PNL-001)' : null);
+/** Indian vehicle number like GJ05AB1234. */
+export const vehicleNo = (v: any) => (v && !/^[A-Za-z]{2}[ -]?\d{1,2}[ -]?[A-Za-z]{0,3}[ -]?\d{1,4}$/.test(String(v).trim()) ? 'Enter a valid vehicle number (e.g. GJ05AB1234)' : null);
+export const noMarkup = (label: string) => (v: any) => (/[<>]/.test(String(v ?? '')) ? `${label} cannot contain < or >` : null);

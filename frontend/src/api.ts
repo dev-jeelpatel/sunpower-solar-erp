@@ -29,24 +29,52 @@ interface ApiOptions {
   form?: FormData;
 }
 
+const TIMEOUT_MS = 30000;
+
+/** Plain-language fallbacks for when the server gives no message of its own. */
+const FRIENDLY: Record<number, string> = {
+  400: 'Some details are not valid. Please check them and try again.',
+  401: 'Your session has expired. Please sign in again.',
+  403: 'You do not have permission to do this.',
+  404: 'We could not find what you asked for.',
+  409: 'This clashes with something that already exists.',
+  413: 'That is too large to send. Try something smaller.',
+  422: 'We could not complete that. Please check the details and try again.',
+  429: 'Too many attempts. Please wait a minute and try again.',
+  502: 'The server is not reachable right now. Please try again shortly.',
+  503: 'The server is busy or restarting. Please try again shortly.',
+  504: 'The server took too long to answer. Please try again.',
+};
+const friendly = (status: number) => FRIENDLY[status] || (status >= 500 ? 'Something went wrong on our side. Please try again in a moment.' : 'The request could not be completed.');
+
 /** Responses are JSON shaped by the server; call sites narrow them with the generic. */
 export async function api<T = any>(path: string, { method = 'GET', body, form }: ApiOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   const token = tokenStore.get();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body) headers['Content-Type'] = 'application/json';
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, { method, headers, body: form || (body ? JSON.stringify(body) : undefined) });
-  } catch {
-    throw new ApiError(0, 'Cannot reach the server. Check your connection and try again.');
+    res = await fetch(`/api${path}`, { method, headers, signal: ctl.signal, body: form || (body ? JSON.stringify(body) : undefined) });
+  } catch (e: any) {
+    throw new ApiError(0, e?.name === 'AbortError'
+      ? 'The server took too long to answer. Please try again.'
+      : (typeof navigator !== 'undefined' && navigator.onLine === false
+        ? 'You appear to be offline. Check your internet connection and try again.'
+        : 'Cannot reach the server. Check your connection and try again.'));
+  } finally {
+    clearTimeout(timer);
   }
   if (res.status === 204) return null as T;
   const isJson = (res.headers.get('content-type') || '').includes('json');
-  const data: any = isJson ? await res.json() : await res.text();
+  let data: any = null;
+  try { data = isJson ? await res.json() : await res.text(); } catch { data = null; }
   if (!res.ok) {
     if (res.status === 401 && token) onUnauthorized();
-    throw new ApiError(res.status, data?.error || 'Request failed', data?.fields);
+    const serverMsg = data && typeof data === 'object' && typeof data.error === 'string' ? data.error : '';
+    throw new ApiError(res.status, serverMsg || friendly(res.status), data && typeof data === 'object' ? data.fields : undefined);
   }
   return data as T;
 }

@@ -967,3 +967,10 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .ta-name { flex: 1; min-width: 0; }
 .no-tech { color: var(--bad); font-weight: 650; }
 .crew-btn { margin-left: auto; }
+
+/* page crash screen (ErrorBoundary) */
+.crash { min-height: 60vh; display: grid; place-items: center; padding: 32px 16px; }
+.crash-card { max-width: 460px; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 20px; padding: 36px 30px; box-shadow: 0 20px 50px rgba(15, 23, 42, .08); }
+.crash-ic { width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 16px; display: grid; place-items: center; background: #fee2e2; color: #b91c1c; font-size: 1.6rem; font-weight: 800; }
+.crash-card h1 { margin: 0 0 8px; font-size: 1.35rem; } .crash-card p { margin: 0 0 20px; color: var(--muted); line-height: 1.6; }
+.crash-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
