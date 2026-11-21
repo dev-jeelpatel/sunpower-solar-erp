@@ -47,7 +47,7 @@ export function FileClaim({ initialSerial = '', onClose }: { initialSerial?: str
     <Modal title="File a warranty claim" wide onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>File claim</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="stack">
-        <Field label="Serial number of the faulty unit" required error={f.errors.serial || (looked ? looked : undefined)} rules={[V.required('Serial number'), V.serialNo]} hint="Printed on the panel, inverter or battery, e.g. INV3-001">
+        <Field label="Serial number of the faulty unit" mask="serial" required error={f.errors.serial || (looked ? looked : undefined)} rules={[V.required('Serial number'), V.serialNo]} hint="Printed on the panel, inverter or battery, e.g. INV3-001">
           <input className="mono" value={f.values.serial} autoFocus onChange={(e) => f.set('serial', e.target.value.toUpperCase())} onBlur={(e) => check(e.target.value)} />
         </Field>
         {unit && (
@@ -56,7 +56,7 @@ export function FileClaim({ initialSerial = '', onClose }: { initialSerial?: str
             <span>{unit.warranty_state === 'in_warranty' ? `Under warranty until ${fmtDate(unit.warranty_end)} (${unit.days_left} days left)` : unit.warranty_state === 'expired' ? `Warranty ended on ${fmtDate(unit.warranty_end)}. The claim can only be approved as goodwill by an admin.` : 'Warranty has not started'}</span>
           </div>
         )}
-        <Field label="What is wrong?" required error={f.errors.issue} rules={[V.required('Description'), V.minLen(10, 'Description'), V.noMarkup('Description')]} hint="Describe what the customer sees and when it started (at least 10 characters)">
+        <Field label="What is wrong?" mask="text" required error={f.errors.issue} rules={[V.required('Description'), V.minLen(10, 'Description'), V.noMarkup('Description')]} hint="Describe what the customer sees and when it started (at least 10 characters)">
           <textarea rows={4} maxLength={1500} value={f.values.issue} onChange={(e) => f.set('issue', e.target.value)} />
         </Field>
         <Field label="Fault code on the display (if any)" error={f.errors.faultCode}><input value={f.values.faultCode} maxLength={30} onChange={(e) => f.set('faultCode', e.target.value)} placeholder="e.g. E04" /></Field>

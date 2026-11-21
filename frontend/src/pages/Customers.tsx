@@ -21,11 +21,11 @@ function CustomerForm({ c, onClose, onDone }) {
     <Modal title={c ? 'Edit customer' : 'New customer'} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Save</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Name" rules={[V.required('Name'), V.personName('Name')]} error={f.errors.name}><input {...f.bind('name')} /></Field>
-        <Field label="Mobile number" rules={[V.required('Mobile number'), V.phone]} error={f.errors.phone}><input {...f.bind('phone')} /></Field>
-        <Field label="Email" rules={[V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
-        <Field label="City" rules={[V.cityName]}><input {...f.bind('city')} /></Field>
-        <Field label="Address" rules={[V.required('Address'), V.addressText('Address')]} className="full" error={f.errors.address}><input {...f.bind('address')} /></Field>
+        <Field label="Name" mask="name" rules={[V.required('Name'), V.personName('Name')]} error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Mobile number" mask="phone" rules={[V.required('Mobile number'), V.phone]} error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Email" mask="email" rules={[V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="City" mask="city" rules={[V.cityName]}><input {...f.bind('city')} /></Field>
+        <Field label="Address" mask="address" rules={[V.required('Address'), V.addressText('Address')]} className="full" error={f.errors.address}><input {...f.bind('address')} /></Field>
       </div>
     </Modal>
   );

@@ -1,6 +1,7 @@
+import { applyMask, type MaskName } from './masks';
 import {
   createContext, useCallback, useContext, useEffect, useRef, useState,
-  type ChangeEvent, type FocusEvent as ReactFocusEvent, type ReactNode,
+  type ChangeEvent, type FocusEvent as ReactFocusEvent, type FormEvent as ReactFormEvent, type KeyboardEvent as ReactKeyEvent, type ReactNode,
 } from 'react';
 import { ApiError } from '../api';
 import type { FieldErrors, Tone } from '../types';
@@ -130,28 +131,66 @@ export function Badge({ status, children }: { status?: string | null; children?:
   return <span className={`badge ${tone}`}>{children || label(status)}</span>;
 }
 
-export function Field({ label: l, error, hint, children, className = '', required, rules }: {
+export function Field({ label: l, error, hint, children, className = '', required, rules, mask, maxDigits }: {
   label?: ReactNode; error?: string; hint?: ReactNode; children?: ReactNode; className?: string; required?: boolean;
-  /** Checked when the person leaves the box, so a mistake is flagged straight away, not only on submit. */
+  /** Checked when the person leaves the box, and again on every keystroke while an error is showing. */
   rules?: Array<(v: any) => string | null | undefined>;
+  /** What may be typed here. Characters that can never be valid are stopped as they are typed, with a short reason. */
+  mask?: MaskName;
+  maxDigits?: number;
 }) {
   const [local, setLocal] = useState('');
+  const [notice, setNotice] = useState('');
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const firstProblem = (v: string) => { for (const r of rules || []) { const m = r(v); if (m) return m; } return ''; };
+
+  const say = (m: string) => {
+    setNotice(m);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setNotice(''), 3200);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+
   const check = (e: ReactFocusEvent<HTMLElement>) => {
     if (!rules) return;
     const t = e.target as HTMLInputElement;
     if (t.type === 'checkbox' || t.type === 'radio' || typeof t.value !== 'string') return;
-    for (const r of rules) {
-      const m = r(t.value);
-      if (m) { setLocal(m); return; }
-    }
-    setLocal('');
+    setLocal(firstProblem(t.value));
   };
+
+  /** Runs before the box's own onChange, so the form only ever receives the cleaned value. */
+  const typing = (e: ReactFormEvent<HTMLElement>) => {
+    const t = e.target as HTMLInputElement;
+    if (t.type === 'checkbox' || t.type === 'radio' || t.type === 'file' || t.type === 'number' || typeof t.value !== 'string') return;
+    let value = t.value;
+    if (mask) {
+      const caret = t.selectionStart ?? value.length;
+      const r = applyMask(mask, value, maxDigits);
+      if (r.value !== value) {
+        const pos = Math.max(0, Math.min(r.value.length, caret - (value.length - r.value.length)));
+        t.value = r.value;
+        try { t.setSelectionRange(pos, pos); } catch { /* some input types have no caret */ }
+        value = r.value;
+      }
+      if (r.notice) say(r.notice);
+    }
+    if (local) setLocal(firstProblem(value)); // while an error is showing, keep it up to date on every keystroke
+  };
+
+  /** Number boxes: no e, + or - (and no decimal point where only whole numbers make sense). */
+  const keys = (e: ReactKeyEvent<HTMLElement>) => {
+    const t = e.target as HTMLInputElement;
+    if (t.type !== 'number' || !mask) return;
+    const bad = ['e', 'E', '+', '-', ...(mask === 'digits' ? ['.', ','] : [])];
+    if (bad.includes(e.key)) { e.preventDefault(); say(mask === 'digits' ? 'Only whole numbers are allowed here' : 'Numbers only, with up to two decimals'); }
+  };
+
   const shown = error || local;
   return (
-    <div className={`field ${shown ? 'invalid' : ''} ${className}`} onBlurCapture={check} onInputCapture={() => local && setLocal('')}>
+    <div className={`field ${shown ? 'invalid' : ''} ${className}`} onBlurCapture={check} onInputCapture={typing} onKeyDownCapture={keys}>
       {l && <label>{l}{required && <span style={{ color: 'var(--bad)' }}> *</span>}</label>}
       {children}
-      {shown ? <span className="err" role="alert">{shown}</span> : hint && <span className="hint">{hint}</span>}
+      {shown ? <span className="err" role="alert">{shown}</span> : notice ? <span className="err notice" role="status">{notice}</span> : hint && <span className="hint">{hint}</span>}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
@@ -13,7 +13,7 @@ const CAT_ICON: Record<string, IconName> = {
   earthing: 'shield', stand: 'wrench', cable: 'chart', connector: 'wrench',
 };
 
-function AdjustStock({ p, onClose, onDone }) {
+export function AdjustStock({ p, onClose, onDone }) {
   const [mode, setMode] = useState<'add' | 'remove'>('add');
   const [qty, setQty] = useState('');
   const [reason, setReason] = useState('');
@@ -36,8 +36,8 @@ function AdjustStock({ p, onClose, onDone }) {
       {error && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="stack">
         <Seg value={mode} onChange={(v) => setMode(v as any)} options={[['add', 'Add stock'], ['remove', 'Remove stock']]} />
-        <Field label="Quantity" rules={[V.required('Quantity'), V.wholeNumber('Quantity', 1, 100000)]} error={err.qty}><input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus /></Field>
-        <Field label="Reason" rules={[V.required('Reason'), V.minLen(3, 'Reason'), V.safeText('Reason', 200)]} error={err.reason} hint="Saved in the history, e.g. Stock count correction, damaged, found in store"><input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+        <Field label="Quantity" mask="digits" rules={[V.required('Quantity'), V.wholeNumber('Quantity', 1, 100000)]} error={err.qty}><input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus /></Field>
+        <Field label="Reason" mask="text" rules={[V.required('Reason'), V.minLen(3, 'Reason'), V.safeText('Reason', 200)]} error={err.reason} hint="Saved in the history, e.g. Stock count correction, damaged, found in store"><input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
         <div className="alert" style={{ margin: 0 }}>Now <b>{p.on_hand}</b> &rarr; after this change <b>{n ? after : p.on_hand}</b></div>
       </div>
     </Modal>
@@ -93,9 +93,9 @@ function Stock() {
   );
 }
 
-function AddSerials({ onClose, onDone }) {
+export function AddSerials({ onClose, onDone, initialProductId = '' }: { onClose: () => void; onDone: () => void; initialProductId?: string }) {
   const prods = useAsync(() => get('/catalog/products'));
-  const [productId, setProductId] = useState('');
+  const [productId, setProductId] = useState(initialProductId);
   const [text, setText] = useState('');
   const [err, setErr] = useState('');
   const [gen, setGen] = useState({ prefix: '', start: '1', pad: 3, count: '' });
@@ -110,6 +110,7 @@ function AddSerials({ onClose, onDone }) {
       if (m) setGen((g) => ({ ...g, prefix: m[1], start: String(Number(m[2]) + 1), pad: m[2].length }));
     } catch { /* suggestion only */ }
   };
+  useEffect(() => { if (initialProductId) pick(initialProductId); }, []); // eslint-disable-line
   const fill = () => {
     const n = Math.min(Math.floor(Number(gen.count)) || 0, 500), from = Math.floor(Number(gen.start)) || 1;
     if (!gen.prefix.trim() || n < 1) return setErr('Enter a prefix and how many serials to generate');
@@ -134,8 +135,8 @@ function AddSerials({ onClose, onDone }) {
           <b className="small">Generate a run of serial numbers</b>
           <div className="row" style={{ alignItems: 'flex-end' }}>
             <Field label="Prefix"><input className="mono" style={{ width: 110 }} value={gen.prefix} onChange={(e) => setGen({ ...gen, prefix: e.target.value.toUpperCase() })} placeholder="PNL-" /></Field>
-            <Field label="Start at" rules={[V.wholeNumber('Start number', 1, 9999999)]}><input type="number" min="1" style={{ width: 90 }} value={gen.start} onChange={(e) => setGen({ ...gen, start: e.target.value })} /></Field>
-            <Field label="How many" rules={[V.wholeNumber('Count', 1, 500)]}><input type="number" min="1" max="500" style={{ width: 90 }} value={gen.count} onChange={(e) => setGen({ ...gen, count: e.target.value })} placeholder="86" /></Field>
+            <Field label="Start at" mask="digits" rules={[V.wholeNumber('Start number', 1, 9999999)]}><input type="number" min="1" style={{ width: 90 }} value={gen.start} onChange={(e) => setGen({ ...gen, start: e.target.value })} /></Field>
+            <Field label="How many" mask="digits" maxDigits={3} rules={[V.wholeNumber('Count', 1, 500)]}><input type="number" min="1" max="500" style={{ width: 90 }} value={gen.count} onChange={(e) => setGen({ ...gen, count: e.target.value })} placeholder="86" /></Field>
             <button type="button" className="btn secondary" onClick={fill}>Fill list</button>
           </div>
         </div>
@@ -292,9 +293,9 @@ function SupplierForm({ s, onClose, onDone }) {
     <Modal title={s ? 'Edit supplier' : 'New supplier'} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={submit}>Save</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Supplier name" rules={[V.required('Supplier name'), V.businessName('Supplier name')]} className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
-        <Field label="Phone" rules={[V.phone]} error={f.errors.phone}><input {...f.bind('phone')} /></Field>
-        <Field label="Email" rules={[V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="Supplier name" mask="company" rules={[V.required('Supplier name'), V.businessName('Supplier name')]} className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Phone" mask="phone" rules={[V.phone]} error={f.errors.phone}><input {...f.bind('phone')} /></Field>
+        <Field label="Email" mask="email" rules={[V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
       </div>
     </Modal>
   );

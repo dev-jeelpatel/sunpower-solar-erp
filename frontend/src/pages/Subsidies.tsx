@@ -27,9 +27,9 @@ function Update({ s, onClose, onDone }) {
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
         <Field label="Move to" className="full"><select {...f.bind('status')}>{next.map((n) => <option key={n} value={n}>{label(n)}</option>)}</select></Field>
-        <Field label="Portal reference no." rules={[V.safeText('Reference number', 60)]} error={f.errors.referenceNo}><input {...f.bind('referenceNo')} /></Field>
-        {['approved', 'disbursed'].includes(v.status) && <Field label="Approved amount (₹)" rules={[V.moneyAmount('Approved amount', 0, 100000000)]} error={f.errors.approvedAmount}><input type="number" {...f.bind('approvedAmount')} /></Field>}
-        <Field label="Notes" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
+        <Field label="Portal reference no." mask="text" rules={[V.safeText('Reference number', 60)]} error={f.errors.referenceNo}><input {...f.bind('referenceNo')} /></Field>
+        {['approved', 'disbursed'].includes(v.status) && <Field label="Approved amount (₹)" mask="decimal" rules={[V.moneyAmount('Approved amount', 0, 100000000)]} error={f.errors.approvedAmount}><input type="number" {...f.bind('approvedAmount')} /></Field>}
+        <Field label="Notes" mask="text" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
       </div>
     </Modal>
   );

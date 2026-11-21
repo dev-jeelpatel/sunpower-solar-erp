@@ -55,7 +55,7 @@ export default function Login() {
 
           <form onSubmit={submit} noValidate className="stack" style={{ gap: 14 }}>
             {error && <div className="alert bad" role="alert">{error}</div>}
-            <Field label="Email" rules={[V.required('Email'), V.email]} error={f.errors.email}>
+            <Field label="Email" mask="email" rules={[V.required('Email'), V.email]} error={f.errors.email}>
               <input type="email" autoComplete="username" autoFocus {...f.bind('email')} placeholder="you@sunpower.test" />
             </Field>
             <Field label="Password" error={f.errors.password}>

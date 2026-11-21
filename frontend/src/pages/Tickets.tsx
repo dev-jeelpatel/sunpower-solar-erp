@@ -85,7 +85,7 @@ function NewTicket({ onClose, initialSerial = '' }: { onClose: () => void; initi
 
         {mode === 'mobile' ? (
           <>
-            <Field label="Customer's mobile number" rules={[V.required('Mobile number'), V.phone]} required error={phoneErr || f.errors.phone} className="full" hint="We find the customer and list the equipment they own.">
+            <Field label="Customer's mobile number" mask="phone" rules={[V.required('Mobile number'), V.phone]} required error={phoneErr || f.errors.phone} className="full" hint="We find the customer and list the equipment they own.">
               <div className="row" style={{ flexWrap: 'nowrap' }}>
                 <input inputMode="tel" autoFocus placeholder="98765 43210" value={phone} onChange={(e) => onPhone(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); findCustomer(); } }} />
@@ -117,7 +117,7 @@ function NewTicket({ onClose, initialSerial = '' }: { onClose: () => void; initi
           </>
         ) : (
           <>
-            <Field label="Inverter / battery serial number" rules={[V.serialNo]} required error={f.errors.serial || lookupErr} className="full" hint="Found on the unit label. We find the customer and warranty automatically.">
+            <Field label="Inverter / battery serial number" mask="serial" rules={[V.serialNo]} required error={f.errors.serial || lookupErr} className="full" hint="Found on the unit label. We find the customer and warranty automatically.">
               <div className="row" style={{ flexWrap: 'nowrap' }}><input className="mono" value={f.values.serial} onChange={(e) => { f.set('serial', e.target.value.toUpperCase()); setFound(null); }} onBlur={check} /><button type="button" className="btn secondary" onClick={check}>Look up</button></div>
             </Field>
             {found && <div className={`alert ${found.warranty_state === 'in_warranty' ? 'ok' : 'warn'} full`}>
@@ -125,10 +125,10 @@ function NewTicket({ onClose, initialSerial = '' }: { onClose: () => void; initi
           </>
         )}
 
-        <Field label="Problem summary" rules={[V.required('Summary'), V.minLen(5, 'Summary'), V.noMarkup('Summary')]} required error={f.errors.subject} className="full"><input {...f.bind('subject')} placeholder="e.g. Inverter shows fault E04, no power" /></Field>
+        <Field label="Problem summary" mask="text" rules={[V.required('Summary'), V.minLen(5, 'Summary'), V.noMarkup('Summary')]} required error={f.errors.subject} className="full"><input {...f.bind('subject')} placeholder="e.g. Inverter shows fault E04, no power" /></Field>
         <Field label="Fault code" error={f.errors.faultCode}><input {...f.bind('faultCode')} /></Field>
         <Field label="Priority"><select {...f.bind('priority')}>{['low', 'normal', 'high', 'urgent'].map((p) => <option key={p}>{p}</option>)}</select></Field>
-        <Field label="Details" rules={[V.safeText('Details', 1000)]} className="full"><textarea {...f.bind('description')} /></Field>
+        <Field label="Details" mask="text" rules={[V.safeText('Details', 1000)]} className="full"><textarea {...f.bind('description')} /></Field>
       </div>
     </Modal>
   );

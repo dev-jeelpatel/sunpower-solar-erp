@@ -94,7 +94,7 @@ export default function DispatchDetail() {
       {open && wh && (
         <div style={{ marginTop: 16 }}><Card title="Release to truck">
           <div className="row" style={{ alignItems: 'flex-start' }}>
-            <Field label="Vehicle number" error={vErr} className="grow" rules={[V.required('Vehicle number'), V.vehicleNo]}><input placeholder="GJ05AB1234" value={vehicle} onChange={(e) => setVehicle(e.target.value.toUpperCase())} /></Field>
+            <Field label="Vehicle number" mask="vehicle" error={vErr} className="grow" rules={[V.required('Vehicle number'), V.vehicleNo]}><input placeholder="GJ05AB1234" value={vehicle} onChange={(e) => setVehicle(e.target.value.toUpperCase())} /></Field>
             <button className="btn" style={{ marginTop: 24 }} disabled={!d.ready} onClick={send}>🚚 Dispatch</button>
           </div>
           {!d.ready && <p className="muted small" style={{ marginBottom: 0 }}>Dispatch is enabled once every serial-numbered item is scanned and bulk items are in stock.</p>}

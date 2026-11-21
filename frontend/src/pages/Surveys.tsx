@@ -40,10 +40,10 @@ function SurveyForm({ s, onClose, onDone }) {
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
         <Field label="Roof faces" required error={f.errors.roofDirection}><select {...f.bind('roofDirection')}><option value="">Select…</option>{['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'].map((d) => <option key={d}>{d}</option>)}</select></Field>
-        <Field label="Roof tilt (°)" rules={[V.required('Tilt'), V.range(0, 90, 'Tilt')]} required error={f.errors.roofTiltDeg}><input type="number" inputMode="decimal" {...f.bind('roofTiltDeg')} /></Field>
-        <Field label="Cable run (m)" rules={[V.required('Cable distance'), V.range(0, 500, 'Cable distance')]} required error={f.errors.cableDistanceM}><input type="number" inputMode="decimal" {...f.bind('cableDistanceM')} /></Field>
-        <Field label="Usable roof area (sq ft)" rules={[V.required('Usable area'), V.positive('Usable area')]} required error={f.errors.usableAreaSqft}><input type="number" inputMode="decimal" {...f.bind('usableAreaSqft')} /></Field>
-        <Field label="Notes" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
+        <Field label="Roof tilt (°)" mask="decimal" rules={[V.required('Tilt'), V.range(0, 90, 'Tilt')]} required error={f.errors.roofTiltDeg}><input type="number" inputMode="decimal" {...f.bind('roofTiltDeg')} /></Field>
+        <Field label="Cable run (m)" mask="decimal" rules={[V.required('Cable distance'), V.range(0, 500, 'Cable distance')]} required error={f.errors.cableDistanceM}><input type="number" inputMode="decimal" {...f.bind('cableDistanceM')} /></Field>
+        <Field label="Usable roof area (sq ft)" mask="decimal" rules={[V.required('Usable area'), V.positive('Usable area')]} required error={f.errors.usableAreaSqft}><input type="number" inputMode="decimal" {...f.bind('usableAreaSqft')} /></Field>
+        <Field label="Notes" mask="text" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
       </div>
     </Modal>
   );

@@ -71,7 +71,7 @@ function LineModal({ t, onClose, onDone }) {
                   ? <Field label="Part from stock" error={e.productId} className="full"><select value={r.productId} onChange={(ev) => pick(i, ev.target.value)}><option value="">Select…</option>{parts.map((p) => <option key={p.product_id} value={p.product_id}>{p.name} · {money(p.sell_price)} · {p.on_hand} in stock</option>)}</select></Field>
                   : <Field label="What is the charge for" rules={[V.noMarkup('Description')]} error={e.description} className="full"><input value={r.description} onChange={(ev) => upd(i, { description: ev.target.value })} placeholder="e.g. Site visit and diagnosis" maxLength={200} /></Field>}
                 <Field label={r.kind === 'part' ? 'Quantity' : 'Hours or units'} rules={[V.required('Quantity'), V.positive('Quantity'), V.range(0, 1000, 'Quantity')]} error={e.quantity}><input type="number" step={r.kind === 'part' ? '1' : '0.5'} min="0" value={r.quantity} onChange={(ev) => upd(i, { quantity: ev.target.value })} /></Field>
-                <Field label="Rate (₹)" rules={[V.required('Rate'), V.moneyAmount('Rate', 0, 1000000)]} error={e.unitPrice}><input type="number" min="0" value={r.unitPrice} onChange={(ev) => upd(i, { unitPrice: ev.target.value })} /></Field>
+                <Field label="Rate (₹)" mask="decimal" rules={[V.required('Rate'), V.moneyAmount('Rate', 0, 1000000)]} error={e.unitPrice}><input type="number" min="0" value={r.unitPrice} onChange={(ev) => upd(i, { unitPrice: ev.target.value })} /></Field>
               </div>
               <div className="tl-sum">Line total <b>{money(lineTotal(r), true)}</b></div>
             </div>
@@ -101,8 +101,8 @@ function ResolveModal({ t, onClose, onDone }) {
         {t.warranty_status === 'in_warranty' ? 'In warranty: this repair is free for the customer.' : 'Out of warranty: parts and labour lines will be billed automatically with GST.'}</div>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="stack">
-        <Field label="What was done" rules={[V.required('Resolution'), V.minLen(5, 'Resolution'), V.noMarkup('Resolution')]} error={f.errors.resolution}><textarea {...f.bind('resolution')} /></Field>
-        {t.serial_no && <Field label="Replacement unit serial (if swapped)" rules={[V.serialNo]} error={f.errors.replacementSerial} hint="The faulty unit is marked faulty and the new unit gets a fresh warranty"><input className="mono" {...f.bind('replacementSerial')} onChange={(e) => f.set('replacementSerial', e.target.value.toUpperCase())} /></Field>}
+        <Field label="What was done" mask="text" rules={[V.required('Resolution'), V.minLen(5, 'Resolution'), V.noMarkup('Resolution')]} error={f.errors.resolution}><textarea {...f.bind('resolution')} /></Field>
+        {t.serial_no && <Field label="Replacement unit serial (if swapped)" mask="serial" rules={[V.serialNo]} error={f.errors.replacementSerial} hint="The faulty unit is marked faulty and the new unit gets a fresh warranty"><input className="mono" {...f.bind('replacementSerial')} onChange={(e) => f.set('replacementSerial', e.target.value.toUpperCase())} /></Field>}
       </div>
     </Modal>
   );

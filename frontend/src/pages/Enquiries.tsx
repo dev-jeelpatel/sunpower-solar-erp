@@ -25,16 +25,16 @@ function NewEnquiry({ onClose, onDone }) {
     <Modal title="New enquiry" onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save enquiry</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Name" rules={[V.required('Name'), V.personName('Name')]} required error={f.errors.name}><input {...f.bind('name')} /></Field>
-        <Field label="Mobile" rules={[V.required('Mobile number'), V.phone]} required error={f.errors.phone}><input inputMode="tel" {...f.bind('phone')} /></Field>
-        <Field label="Email" rules={[V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
-        <Field label="City" rules={[V.cityName]} error={f.errors.city}><input {...f.bind('city')} /></Field>
-        <Field label="Address" rules={[V.required('Address'), V.addressText('Address')]} required error={f.errors.address} className="full"><input {...f.bind('address')} /></Field>
+        <Field label="Name" mask="name" rules={[V.required('Name'), V.personName('Name')]} required error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Mobile" mask="phone" rules={[V.required('Mobile number'), V.phone]} required error={f.errors.phone}><input inputMode="tel" {...f.bind('phone')} /></Field>
+        <Field label="Email" mask="email" rules={[V.email]} error={f.errors.email}><input type="email" {...f.bind('email')} /></Field>
+        <Field label="City" mask="city" rules={[V.cityName]} error={f.errors.city}><input {...f.bind('city')} /></Field>
+        <Field label="Address" mask="address" rules={[V.required('Address'), V.addressText('Address')]} required error={f.errors.address} className="full"><input {...f.bind('address')} /></Field>
         <Field label="Size (kW)" error={f.errors.requestedKw}><select {...f.bind('requestedKw')}>{[1, 2, 3, 4, 5].map((k) => <option key={k}>{k}</option>)}</select></Field>
         <Field label="Type"><select {...f.bind('systemType')}><option value="on_grid">On-Grid</option><option value="off_grid">Off-Grid</option></select></Field>
         <Field label="Came in via"><select {...f.bind('source')}><option value="call">Phone call</option><option value="whatsapp">WhatsApp</option><option value="walk_in">Walk-in</option><option value="web">Web</option></select></Field>
         <label className="check"><input type="checkbox" checked={f.values.subsidyRequired} onChange={(e) => f.set('subsidyRequired', e.target.checked)} /> Wants subsidy</label>
-        <Field label="Notes" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('message')} /></Field>
+        <Field label="Notes" mask="text" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('message')} /></Field>
       </div>
     </Modal>
   );

@@ -1,3 +1,4 @@
+import { AddSerials, AdjustStock } from './Inventory';
 import { useState } from 'react';
 import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
@@ -9,7 +10,7 @@ import * as V from '../validators';
 
 const CATS = ['panel', 'inverter', 'battery', 'charge_controller', 'wiring_box', 'switch', 'earthing', 'stand', 'cable', 'connector', 'service'];
 
-function ProductForm({ p, onClose, onDone }) {
+function ProductForm({ p, onClose, onDone, onStock }: { p: any; onClose: () => void; onDone: () => void; onStock?: (p: any) => void }) {
   const f = useForm({ sku: p?.sku || '', name: p?.name || '', category: p?.category || 'panel', trackedSerial: p?.tracked_serial || false, warrantyMonths: p?.warranty_months ?? 0 /* not in v_stock */, costPrice: p?.cost_price ?? '', sellPrice: p?.sell_price ?? '', reorderLevel: p?.reorder_level ?? 0 });
   const { run, busy, error } = useAction(f.setErrors);
   const v = f.values;
@@ -25,13 +26,23 @@ function ProductForm({ p, onClose, onDone }) {
     <Modal title={p ? 'Edit product' : 'New product'} onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="SKU" rules={[V.required('SKU'), V.skuCode]} error={f.errors.sku}><input {...f.bind('sku')} style={{ textTransform: 'uppercase' }} /></Field>
+        <Field label="SKU" mask="sku" rules={[V.required('SKU'), V.skuCode]} error={f.errors.sku}><input {...f.bind('sku')} style={{ textTransform: 'uppercase' }} /></Field>
         <Field label="Category" error={f.errors.category}><select {...f.bind('category')}>{CATS.map((c) => <option key={c} value={c}>{label(c)}</option>)}</select></Field>
-        <Field label="Name" rules={[V.required('Name'), V.minLen(3, 'Name'), V.noMarkup('Name')]} className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
-        <Field label="Cost price (₹)" rules={[V.required('Cost price'), V.moneyAmount('Cost price', 0, 10000000)]} error={f.errors.costPrice}><input type="number" min="0" {...f.bind('costPrice')} /></Field>
-        <Field label="Selling price (₹)" rules={[V.required('Selling price'), V.moneyAmount('Selling price', 0, 10000000)]} error={f.errors.sellPrice}><input type="number" min="0" {...f.bind('sellPrice')} /></Field>
-        <Field label="Warranty (months)" rules={[V.wholeNumber('Warranty', 0, 600)]} hint="Starts automatically at delivery" error={f.errors.warrantyMonths}><input type="number" min="0" {...f.bind('warrantyMonths')} /></Field>
-        <Field label="Reorder level" rules={[V.wholeNumber('Reorder level', 0, 100000)]} error={f.errors.reorderLevel}><input type="number" min="0" {...f.bind('reorderLevel')} /></Field>
+        <Field label="Name" mask="text" rules={[V.required('Name'), V.minLen(3, 'Name'), V.noMarkup('Name')]} className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Cost price (₹)" mask="decimal" rules={[V.required('Cost price'), V.moneyAmount('Cost price', 0, 10000000)]} error={f.errors.costPrice}><input type="number" min="0" {...f.bind('costPrice')} /></Field>
+        <Field label="Selling price (₹)" mask="decimal" rules={[V.required('Selling price'), V.moneyAmount('Selling price', 0, 10000000)]} error={f.errors.sellPrice}><input type="number" min="0" {...f.bind('sellPrice')} /></Field>
+        <Field label="Warranty (months)" mask="digits" rules={[V.wholeNumber('Warranty', 0, 600)]} hint="Starts automatically at delivery" error={f.errors.warrantyMonths}><input type="number" min="0" {...f.bind('warrantyMonths')} /></Field>
+        <Field label="Reorder level" mask="digits" rules={[V.wholeNumber('Reorder level', 0, 100000)]} error={f.errors.reorderLevel}><input type="number" min="0" {...f.bind('reorderLevel')} /></Field>
+        {p && onStock && (
+          <div className="full stock-box">
+            <div>
+              <span>Stock right now</span>
+              <b>{Number(p.on_hand).toLocaleString('en-IN')}</b>
+              <small>{p.tracked_serial ? 'Counted by serial number. To change it, add serials, or delete one on the Inventory page.' : 'Counted by quantity. Add or remove stock with a reason.'}</small>
+            </div>
+            <button type="button" className="btn secondary" onClick={() => onStock(p)}>{p.tracked_serial ? 'Add serial numbers' : 'Update stock'}</button>
+          </div>
+        )}
         <label className="check full"><input type="checkbox" checked={v.trackedSerial} onChange={(e) => f.set('trackedSerial', e.target.checked)} /> Track each unit by serial number</label>
       </div>
     </Modal>
@@ -59,10 +70,10 @@ function PackageForm({ pkg, products, onClose, onDone }) {
     <Modal title={pkg ? 'Edit package' : 'New package'} onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
-        <Field label="Package name" rules={[V.required('Package name'), V.minLen(3, 'Package name'), V.noMarkup('Package name')]} className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
+        <Field label="Package name" mask="text" rules={[V.required('Package name'), V.minLen(3, 'Package name'), V.noMarkup('Package name')]} className="full" error={f.errors.name}><input {...f.bind('name')} /></Field>
         <Field label="Type"><select {...f.bind('kind')}><option value="on_grid">On-grid</option><option value="off_grid">Off-grid</option><option value="hardware">Hardware</option><option value="service">Service</option></select></Field>
-        {grid && <Field label="Capacity (kW)" rules={[V.wholeNumber('Capacity', 1, 5)]} error={f.errors.capacityKw}><input type="number" min="1" max="5" {...f.bind('capacityKw')} /></Field>}
-        <Field label="Description" rules={[V.safeText('Description', 500)]} className="full"><input {...f.bind('description')} /></Field>
+        {grid && <Field label="Capacity (kW)" mask="digits" rules={[V.wholeNumber('Capacity', 1, 5)]} error={f.errors.capacityKw}><input type="number" min="1" max="5" {...f.bind('capacityKw')} /></Field>}
+        <Field label="Description" mask="text" rules={[V.safeText('Description', 500)]} className="full"><input {...f.bind('description')} /></Field>
       </div>
       <h4 style={{ margin: '16px 0 8px' }}>Parts in this package</h4>
       <div className="stack">
@@ -86,6 +97,7 @@ export default function Catalog() {
   const prods = useAsync(() => get('/catalog/products'));
   const pkgs = useAsync(() => get('/catalog/packages'));
   const [edit, setEdit] = useState<any>(null);
+  const [stockFor, setStockFor] = useState<any>(null);
   const [open, setOpen] = useState<any>(null);
   const [pkgEdit, setPkgEdit] = useState<any>(null);
   const [ask, setAsk] = useState<any>(null);
@@ -168,7 +180,10 @@ export default function Catalog() {
       {pkgEdit && <PackageForm pkg={pkgEdit.id ? pkgEdit : null} products={(prods.data || []).filter((p) => p.active !== false)} onClose={() => setPkgEdit(null)} onDone={() => { setPkgEdit(null); reloadAll(); }} />}
       {ask && <Confirm danger yesLabel="Delete" title={ask.type === 'package' ? 'Delete package?' : 'Delete product?'} onNo={() => setAsk(null)} onYes={confirmDelete}
         message={ask.type === 'package' ? <>“{ask.item.name}” will no longer be offered for new quotes. Existing quotes and orders keep their own copy.</> : <>“{ask.item.name}” will be removed. If it already appears on quotes, orders or stock, it is hidden instead so your records stay intact.</>} />}
-      {edit && <ProductForm p={edit.sku ? edit : null} onClose={() => setEdit(null)} onDone={() => { setEdit(null); prods.reload(); pkgs.reload(); }} />}
+      {edit && <ProductForm p={edit.sku ? edit : null} onClose={() => setEdit(null)} onDone={() => { setEdit(null); prods.reload(); pkgs.reload(); }} onStock={can(user, 'warehouse') ? (pr) => { setEdit(null); setStockFor(pr); } : undefined} />}
+      {stockFor && (stockFor.tracked_serial
+        ? <AddSerials initialProductId={String(stockFor.product_id)} onClose={() => setStockFor(null)} onDone={() => { setStockFor(null); prods.reload(); }} />
+        : <AdjustStock p={stockFor} onClose={() => setStockFor(null)} onDone={() => { setStockFor(null); prods.reload(); }} />)}
     </>
   );
 }

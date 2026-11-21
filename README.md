@@ -411,6 +411,7 @@ Every value is checked twice: in the browser for instant feedback, and on the se
 
 **In the forms**
 - A mistake is flagged as soon as you leave the box, in plain words under that box (for example "Please enter a valid email address (e.g. name@example.com)"), and the message disappears once you start fixing it.
+- **Typing is guided:** characters that can never be valid are stopped as you type, with a short reason under the box. A mobile number accepts only digits and stops at 10 (and must start with 6 to 9), names and cities accept only letters, email stops at one @ and takes no spaces, number boxes refuse e, + and -, and serial numbers, SKUs and vehicle numbers are upper-cased and limited to letters, digits and dashes. Pasting `+91 98250 10001` is cleaned to `9825010001`. Once an error is showing, it re-checks on every keystroke and disappears the moment the value is right.
 - On submit every problem is shown at once; the server's per-field messages are placed under the matching box too.
 - Rules: names (letters, spaces and `. ' -` only), city, address (needs a real word), Indian mobile numbers (rejects fake-looking ones), email format, SKU and serial-number format, vehicle number, money amounts (two decimals at most, sensible limits), whole numbers within a range, and no `<` or `>` in free text.
 
