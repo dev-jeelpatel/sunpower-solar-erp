@@ -26,6 +26,7 @@ const NAV: [string, NavItem[]][] = [
   ]],
   ['After-sales', [
     ['/tickets', 'Service tickets', 'ticket', ['support', 'technician', 'director']],
+    ['/claims', 'Warranty claims', 'shield', ['support', 'technician', 'warehouse', 'director']],
     ['/lookup', 'Warranty lookup', 'search', ['support', 'sales', 'warehouse', 'director']],
   ]],
   ['Management', [

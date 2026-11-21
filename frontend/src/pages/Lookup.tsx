@@ -1,3 +1,4 @@
+import { FileClaim } from './Claims';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { get } from '../api';
@@ -15,6 +16,7 @@ export default function Lookup() {
   const [unit, setUnit] = useState<any>(null);
   const [err, setErr] = useState('');
   const [raising, setRaising] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const results = useAsync(() => (dq.trim().length >= 3 ? get(`/search?q=${encodeURIComponent(dq.trim())}`) : Promise.resolve({ units: [], customers: [] })), [dq]);
 
   const open = async (serial: string) => {
@@ -81,13 +83,14 @@ export default function Lookup() {
                   <dt>Warranty term</dt><dd>{unit.warranty_months} months{unit.warranty_start ? ` · started ${fmtDate(unit.warranty_start)}` : ''}</dd>
                   <dt>Past tickets</dt><dd>{(unit.tickets || []).length === 0 ? 'None' : unit.tickets.map((t) => <div key={t.id}><Link to={`/tickets/${t.id}`}>{t.ticketNo}</Link> · {t.subject} <Badge status={t.status} /></div>)}</dd>
                 </dl>
-                {unit.customer_id && can(user, 'support', 'sales') && <div style={{ marginTop: 16 }}><button className="btn" onClick={() => setRaising(true)}><Icon n="ticket" />Raise service ticket</button></div>}
+                {unit.customer_id && can(user, 'support', 'sales') && <div className="row" style={{ marginTop: 16 }}><button className="btn" onClick={() => setRaising(true)}><Icon n="ticket" />Raise service ticket</button>{can(user, 'support') && unit.status === 'delivered' && <button className="btn secondary" onClick={() => setClaiming(true)}><Icon n="shield" />File warranty claim</button>}</div>}
               </Card>
             </div>
           )}
         </div>
       </div>
       {raising && <NewTicket initialSerial={unit.serial_no} onClose={() => setRaising(false)} />}
+      {claiming && <FileClaim initialSerial={unit.serial_no} onClose={() => setClaiming(false)} />}
     </>
   );
 }

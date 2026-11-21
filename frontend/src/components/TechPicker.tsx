@@ -6,13 +6,13 @@ import { fmtDate, useAsync } from './ui';
  * Pick one technician for a date. The list is checked against their schedule first:
  * a busy technician cannot be chosen, and the reason and next free day are shown.
  */
-export default function TechPicker({ date, value, onChange, onPickDate, excludeJobId, current }: {
+export default function TechPicker({ date, value, onChange, onPickDate, excludeJobId, excludeClaimId, current }: {
   date: string; value: string; onChange: (id: string) => void; onPickDate?: (d: string) => void;
-  excludeJobId?: number; current?: string[];
+  excludeJobId?: number; excludeClaimId?: number; current?: string[];
 }) {
   const state = useAsync(
-    () => (date ? get(`/availability?date=${date}${excludeJobId ? `&excludeJobId=${excludeJobId}` : ''}`) : Promise.resolve([])),
-    [date, excludeJobId],
+    () => (date ? get(`/availability?date=${date}${excludeJobId ? `&excludeJobId=${excludeJobId}` : ''}${excludeClaimId ? `&excludeClaimId=${excludeClaimId}` : ''}`) : Promise.resolve([])),
+    [date, excludeJobId, excludeClaimId],
   );
   const list: any[] = state.data || [];
 

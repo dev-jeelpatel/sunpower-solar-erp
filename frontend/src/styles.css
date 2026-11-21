@@ -974,3 +974,19 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .crash-ic { width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 16px; display: grid; place-items: center; background: #fee2e2; color: #b91c1c; font-size: 1.6rem; font-weight: 800; }
 .crash-card h1 { margin: 0 0 8px; font-size: 1.35rem; } .crash-card p { margin: 0 0 20px; color: var(--muted); line-height: 1.6; }
 .crash-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* ticket: several lines at once */
+.tl-row { padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: #fafbfe; display: grid; gap: 10px; }
+.tl-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; } .tl-head .btn { margin-left: auto; }
+.tl-sum { text-align: right; color: var(--muted); font-size: .88rem; } .tl-sum b { color: var(--text); }
+
+/* warranty claims */
+.claim-elig { display: grid; gap: 3px; padding: 12px 14px; border-radius: 12px; font-size: .9rem; }
+.claim-elig span { font-size: .84rem; } .claim-elig.ok { background: #ecfdf5; color: #065f46; } .claim-elig.bad { background: #fef2f2; color: #991b1b; }
+.claim-brief { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; padding: 14px 16px; border-radius: 14px; background: #f4f6fd; }
+.claim-brief span { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); } .claim-brief b { font-size: .92rem; }
+.claim-brief p { grid-column: 1 / -1; margin: 0; font-size: .88rem; color: var(--text-2); line-height: 1.55; }
+.claim-tl { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--border); display: grid; gap: 14px; }
+.claim-tl li { position: relative; display: grid; gap: 2px; } .claim-tl li::before { content: ''; position: absolute; left: -21px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 3px #fff; }
+.claim-tl span { color: var(--muted); font-size: .78rem; }
+@media (max-width: 640px) { .claim-brief { grid-template-columns: 1fr; } }

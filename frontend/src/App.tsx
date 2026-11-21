@@ -31,6 +31,8 @@ const JobDetail = lazy(() => import('./pages/JobDetail.tsx'));
 const Tickets = lazy(() => import('./pages/Tickets.tsx'));
 const TicketDetail = lazy(() => import('./pages/TicketDetail.tsx'));
 const Lookup = lazy(() => import('./pages/Lookup.tsx'));
+const Claims = lazy(() => import('./pages/Claims.tsx'));
+const ClaimDetail = lazy(() => import('./pages/ClaimDetail.tsx'));
 const Reports = lazy(() => import('./pages/Reports.tsx'));
 const Users = lazy(() => import('./pages/Users.tsx'));
 
@@ -74,6 +76,8 @@ export default function App() {
           <Route path="tickets" element={<Tickets />} />
           <Route path="tickets/:id" element={<TicketDetail />} />
           <Route path="lookup" element={<Lookup />} />
+          <Route path="claims" element={<Claims />} />
+          <Route path="claims/:id" element={<ClaimDetail />} />
           <Route path="reports" element={<Reports />} />
           <Route path="users" element={<Users />} />
         </Route>
