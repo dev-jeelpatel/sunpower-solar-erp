@@ -19,6 +19,8 @@ import { quotesRouter } from './modules/quotes/quotes.routes';
 import { invoicesRouter } from './modules/invoices/invoices.routes';
 import { reportsRouter } from './modules/reports/reports.routes';
 import { surveysRouter } from './modules/surveys/surveys.routes';
+import { dispatchRouter } from './modules/dispatch/dispatch.routes';
+import { jobsRouter } from './modules/jobs/jobs.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
@@ -59,6 +61,8 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/invoices', invoicesRouter);
 app.use('/api/surveys', surveysRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/dispatches', dispatchRouter);
+app.use('/api/jobs', jobsRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
