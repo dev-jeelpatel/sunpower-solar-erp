@@ -1,15 +1,22 @@
 // @ts-nocheck
-// Demo data: staff, catalogue, packages (bill of materials), stock with serial numbers,
-// a live sales pipeline, and historical installations (in and out of warranty).
-// Usage: npm run db:seed   (empty database only)
+// Demo data: six months of business (June to 21 November 2026).
+//   npm run db:seed      loads it into an EMPTY database
+//   npm run db:reseed    wipes ALL data first, then loads it (everything runs in one transaction: all or nothing)
+//
+// Serial numbers are short and sequential so they are easy to type when scanning by hand:
+//   PNL-001..   panels          INV1-001.. INV2-001.. INV3-001.. INV4-001.. INV5-001..  inverters by size
+//   BAT-001..   batteries       MC40-001.. MC60-001..  charge controllers
+// Stock is dispatched oldest-first, so the lowest number still "in stock" is always the next one to scan.
+// Customer mobile numbers run 9825010001, 9825010002, ... in the order the enquiries arrived.
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { Pool } from 'pg';
 import { env } from '../../src/config/env';
-import { prisma, tx as prismaTx } from '../../src/lib/prisma';
-import { ordersService } from '../../src/modules/orders/orders.service';
 
 const pool = new Pool({ connectionString: env.databaseUrl });
+const RESET = process.argv.includes('--reset');
+const PASSWORD = 'Sunpower@123';
+
 async function tx(fn) {
   const client = await pool.connect();
   try {
@@ -24,8 +31,22 @@ async function tx(fn) {
     client.release();
   }
 }
-const PASSWORD = 'Sunpower@123';
 
+// ---------------------------------------------------------------- dates
+const TODAY = '2026-11-21';
+const DAY = 864e5;
+const at = (iso, h = 11, m = 0) => new Date(`${iso}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+05:30`);
+const plus = (d, days, hour) => {
+  const x = new Date(d.getTime() + days * DAY);
+  if (hour == null) return x;
+  const iso = x.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  return at(iso, hour);
+};
+const ymd = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+const subsidyFor = (kw) => (kw >= 3 ? 78000 : kw >= 2 ? 60000 : 30000);
+
+// ---------------------------------------------------------------- reference data
 const STAFF = [
   ['Aarav Admin', 'admin@sunpower.test', 'admin', 0],
   ['Sneha Sales', 'sales@sunpower.test', 'sales', 0],
@@ -38,26 +59,26 @@ const STAFF = [
   ['Divya Director', 'director@sunpower.test', 'director', 0],
 ];
 
-// sku, name, category, serial?, warrantyMonths, cost, sell, reorder
+// sku, name, category, serial?, warrantyMonths, cost, sell, reorder, serial prefix
 const PRODUCTS = [
-  ['PNL-540', 'Mono PERC Solar Panel 540W', 'panel', true, 240, 8200, 9800, 12],
-  ['INV-1K', 'Solar Inverter 1 kW', 'inverter', true, 24, 9000, 11500, 2],
-  ['INV-2K', 'Solar Inverter 2 kW', 'inverter', true, 24, 14000, 17000, 2],
-  ['INV-3K', 'Solar Inverter 3 kW', 'inverter', true, 24, 19000, 23000, 2],
-  ['INV-4K', 'Solar Inverter 4 kW', 'inverter', true, 24, 24000, 29000, 2],
-  ['INV-5K', 'Solar Inverter 5 kW', 'inverter', true, 24, 30000, 36000, 2],
-  ['BAT-150', 'Tubular Battery 12V 150Ah', 'battery', true, 24, 13500, 16500, 4],
-  ['MPPT-40A', 'MPPT Charge Controller 40A', 'charge_controller', true, 24, 3500, 4600, 3],
-  ['MPPT-60A', 'MPPT Charge Controller 60A', 'charge_controller', true, 24, 5200, 6800, 3],
-  ['STAND-AL', 'Aluminium Mounting Stand (per panel)', 'stand', false, 0, 1100, 1500, 20],
-  ['DCDB', 'DC Distribution Box', 'wiring_box', false, 0, 1800, 2400, 4],
-  ['ACDB', 'AC Distribution Box', 'wiring_box', false, 0, 1500, 2000, 4],
-  ['MCB-SW', 'MCB Safety Switch', 'switch', false, 0, 400, 600, 10],
-  ['CBL-DC', 'DC Solar Cable 4 sq mm (per metre)', 'cable', false, 0, 60, 85, 100],
-  ['CBL-AC', 'AC Cable (per metre)', 'cable', false, 0, 90, 125, 100],
-  ['MC4', 'MC4 Connector Pair', 'connector', false, 0, 80, 120, 20],
-  ['EARTH-KIT', 'Safety Earthing Kit', 'earthing', false, 0, 2200, 3000, 4],
-  ['SVC-INSTALL', 'Installation & Testing (per kW)', 'service', false, 0, 0, 4000, 0],
+  ['PNL-540', 'Mono PERC Solar Panel 540W', 'panel', true, 240, 8200, 9800, 12, 'PNL'],
+  ['INV-1K', 'Solar Inverter 1 kW', 'inverter', true, 24, 9000, 11500, 2, 'INV1'],
+  ['INV-2K', 'Solar Inverter 2 kW', 'inverter', true, 24, 14000, 17000, 2, 'INV2'],
+  ['INV-3K', 'Solar Inverter 3 kW', 'inverter', true, 24, 19000, 23000, 2, 'INV3'],
+  ['INV-4K', 'Solar Inverter 4 kW', 'inverter', true, 24, 24000, 29000, 2, 'INV4'],
+  ['INV-5K', 'Solar Inverter 5 kW', 'inverter', true, 24, 30000, 36000, 2, 'INV5'],
+  ['BAT-150', 'Tubular Battery 12V 150Ah', 'battery', true, 24, 13500, 16500, 4, 'BAT'],
+  ['MPPT-40A', 'MPPT Charge Controller 40A', 'charge_controller', true, 24, 3500, 4600, 3, 'MC40'],
+  ['MPPT-60A', 'MPPT Charge Controller 60A', 'charge_controller', true, 24, 5200, 6800, 3, 'MC60'],
+  ['STAND-AL', 'Aluminium Mounting Stand (per panel)', 'stand', false, 0, 1100, 1500, 20, null],
+  ['DCDB', 'DC Distribution Box', 'wiring_box', false, 0, 1800, 2400, 4, null],
+  ['ACDB', 'AC Distribution Box', 'wiring_box', false, 0, 1500, 2000, 4, null],
+  ['MCB-SW', 'MCB Safety Switch', 'switch', false, 0, 400, 600, 10, null],
+  ['CBL-DC', 'DC Solar Cable 4 sq mm (per metre)', 'cable', false, 0, 60, 85, 100, null],
+  ['CBL-AC', 'AC Cable (per metre)', 'cable', false, 0, 90, 125, 100, null],
+  ['MC4', 'MC4 Connector Pair', 'connector', false, 0, 80, 120, 20, null],
+  ['EARTH-KIT', 'Safety Earthing Kit', 'earthing', false, 0, 2200, 3000, 4, null],
+  ['SVC-INSTALL', 'Installation & Testing (per kW)', 'service', false, 0, 0, 4000, 0, null],
 ];
 
 const PANELS = { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10 };
@@ -69,32 +90,75 @@ function bom(type, kw) {
   return items;
 }
 
+// ---------------------------------------------------------------- the six-month story
+const NAMES = [
+  ['Ramesh Parmar', 'Surat'], ['Dhruv Solanki', 'Vadodara'], ['Smita Bhatt', 'Ahmedabad'], ['Kalpesh Rana', 'Rajkot'],
+  ['Nisha Kapadia', 'Ahmedabad'], ['Vijay Trivedi', 'Gandhinagar'], ['Anita Joshi', 'Surat'], ['Mahesh Desai', 'Vadodara'],
+  ['Pooja Mehta', 'Ahmedabad'], ['Hetal Shah', 'Rajkot'], ['Bhavesh Patel', 'Surat'], ['Jignesh Modi', 'Bharuch'],
+  ['Komal Dave', 'Ahmedabad'], ['Chirag Thakkar', 'Vadodara'], ['Rina Amin', 'Gandhinagar'], ['Sagar Vyas', 'Surat'],
+  ['Payal Chauhan', 'Ahmedabad'], ['Harsh Panchal', 'Rajkot'], ['Isha Bhatt', 'Vadodara'], ['Nilesh Gandhi', 'Surat'],
+  ['Divya Soni', 'Ahmedabad'], ['Tarun Jani', 'Gandhinagar'], ['Foram Patel', 'Rajkot'], ['Yash Raval', 'Surat'],
+  ['Kavya Nair', 'Ahmedabad'], ['Mitesh Joshi', 'Vadodara'], ['Reena Kothari', 'Surat'], ['Pranav Shukla', 'Ahmedabad'],
+  ['Alpa Dalal', 'Gandhinagar'], ['Kunal Barot', 'Rajkot'], ['Seema Rao', 'Ahmedabad'], ['Dev Mistry', 'Surat'],
+];
+const SOCIETIES = ['Shanti Nagar', 'Sunrise Society', 'Green Park', 'Maple Residency', 'Lotus Heights', 'Orchid Villas'];
+// [enquiry date, where the deal stands today]
+const PLAN = [
+  ['2026-06-03', 'done'], ['2026-06-12', 'done'], ['2026-06-22', 'done'],
+  ['2026-07-05', 'done'], ['2026-07-14', 'done'], ['2026-07-26', 'done'],
+  ['2026-08-03', 'done'], ['2026-08-10', 'done'], ['2026-08-18', 'done'], ['2026-08-27', 'done'],
+  ['2026-09-02', 'done'], ['2026-09-09', 'done'], ['2026-09-15', 'lost'], ['2026-09-22', 'done'], ['2026-09-28', 'done'],
+  ['2026-10-03', 'done'], ['2026-10-08', 'done'], ['2026-10-14', 'done'], ['2026-10-20', 'done'], ['2026-10-24', 'done'],
+  ['2026-10-28', 'installing'], ['2026-10-30', 'lost'],
+  ['2026-11-01', 'ready'], ['2026-11-03', 'dispatched'], ['2026-11-05', 'ready'], ['2026-11-08', 'awaiting_advance'],
+  ['2026-11-11', 'quote_sent'], ['2026-11-14', 'survey_done'], ['2026-11-17', 'survey_booked'], ['2026-11-19', 'qualified'],
+  ['2026-11-20', 'contacted'], ['2026-11-21', 'new'],
+];
+const RANK = { new: 0, contacted: 1, qualified: 2, survey_booked: 3, survey_done: 4, quote_sent: 5, awaiting_advance: 6, ready: 7, dispatched: 8, installing: 9, done: 10 };
+const ENQ_STATUS = { new: 'new', contacted: 'contacted', qualified: 'qualified', survey_booked: 'survey_scheduled', survey_done: 'survey_approved', quote_sent: 'quoted', lost: 'lost' };
+const KWS = [3, 2, 4, 3, 5, 1, 3, 2, 3, 4];
+const SOURCES = ['web', 'call', 'whatsapp', 'walk_in'];
+const METHODS = ['upi', 'bank_transfer', 'cash', 'cheque', 'card'];
+const DIRS = ['S', 'SW', 'SE', 'S', 'W'];
+
 async function main() {
   const { rows: existing } = await pool.query('SELECT count(*)::int AS n FROM users');
-  if (existing[0].n > 0) throw new Error('Database already has data. Run "npm run db:reset" for a clean demo database.');
+  if (existing[0].n > 0 && !RESET) throw new Error('The database already has data. Run "npm run db:reseed" to wipe everything and load the demo data again.');
   const hash = await bcrypt.hash(PASSWORD, 10);
 
-  await tx(async (db) => {
-    // ---- staff
+  const summary = await tx(async (db) => {
+    const q = async (text, params) => (await db.query(text, params)).rows;
+    const q1 = async (text, params) => (await db.query(text, params)).rows[0];
+
+    // ------------------------------------------------------------ wipe (only with --reset)
+    if (RESET) {
+      const tables = (await q("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'")).map((r) => `"${r.tablename}"`);
+      await db.query(`TRUNCATE TABLE ${tables.join(', ')} RESTART IDENTITY CASCADE`);
+      for (const s of ['quote_seq', 'order_seq', 'invoice_seq', 'ticket_seq', 'po_seq']) await db.query(`ALTER SEQUENCE ${s} RESTART WITH 1`);
+    }
+
+    // ------------------------------------------------------------ staff, catalogue
     const U = {};
     for (const [name, email, role, rate] of STAFF) {
-      const { rows } = await db.query('INSERT INTO users (name,email,password_hash,role,hourly_rate) VALUES ($1,$2,$3,$4,$5) RETURNING id', [name, email, hash, role, rate]);
-      U[email.split('@')[0]] = rows[0].id;
+      const r = await q1('INSERT INTO users (name,email,password_hash,role,hourly_rate) VALUES ($1,$2,$3,$4,$5) RETURNING id', [name, email, hash, role, rate]);
+      U[email.split('@')[0]] = r.id;
     }
-    // ---- products
+    const techs = [U.tech1, U.tech2, U.tech3];
+    const salesIds = [U.sales, U.sales2];
+
     const P = {};
+    const price = {};
     for (const [sku, name, cat, tracked, war, cost, sell, reorder] of PRODUCTS) {
-      const { rows } = await db.query(
-        'INSERT INTO products (sku,name,category,tracked_serial,warranty_months,cost_price,sell_price,reorder_level) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+      const r = await q1('INSERT INTO products (sku,name,category,tracked_serial,warranty_months,cost_price,sell_price,reorder_level) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
         [sku, name, cat, tracked, war, cost, sell, reorder]);
-      P[sku] = rows[0].id;
+      P[sku] = r.id;
+      price[sku] = { sell, cost, name, tracked };
     }
-    // ---- packages
     const PK = {};
     const mkPkg = async (name, kind, kw, desc, items) => {
-      const { rows } = await db.query('INSERT INTO packages (name,kind,capacity_kw,description) VALUES ($1,$2,$3,$4) RETURNING id', [name, kind, kw, desc]);
-      for (const [sku, q] of items) await db.query('INSERT INTO package_items (package_id,product_id,quantity) VALUES ($1,$2,$3)', [rows[0].id, P[sku], q]);
-      return rows[0].id;
+      const r = await q1('INSERT INTO packages (name,kind,capacity_kw,description) VALUES ($1,$2,$3,$4) RETURNING id', [name, kind, kw, desc]);
+      for (const [sku, n] of items) await db.query('INSERT INTO package_items (package_id,product_id,quantity) VALUES ($1,$2,$3)', [r.id, P[sku], n]);
+      return r.id;
     };
     await mkPkg('Solar Panel Set (Hardware)', 'hardware', null, 'Solar panels, connectors and wires', [['PNL-540', 4], ['MC4', 4], ['CBL-DC', 20]]);
     for (const kw of [1, 2, 3, 4, 5]) {
@@ -103,142 +167,274 @@ async function main() {
     }
     await mkPkg('Installation (Service)', 'service', null, 'Fitting and testing by our crew', [['SVC-INSTALL', 1]]);
 
-    // ---- supplier + goods receipt with serial numbers
-    const { rows: sup } = await db.query(`INSERT INTO suppliers (name, phone) VALUES ('Sunrise Distributors Pvt Ltd','9825012345'), ('GreenVolt Components','9898098980') RETURNING id`);
-    const { rows: po } = await db.query(`INSERT INTO purchase_orders (supplier_id, status, received_at, created_by) VALUES ($1,'received', now() - interval '10 days', $2) RETURNING id`, [sup[0].id, U.warehouse]);
-    const stock = { 'PNL-540': 80, 'INV-1K': 3, 'INV-2K': 4, 'INV-3K': 6, 'INV-4K': 3, 'INV-5K': 3, 'BAT-150': 16, 'MPPT-40A': 6, 'MPPT-60A': 8,
-      'STAND-AL': 120, DCDB: 20, ACDB: 20, 'MCB-SW': 60, 'CBL-DC': 1500, 'CBL-AC': 800, MC4: 120, 'EARTH-KIT': 20 };
-    let sn = 4000;
-    for (const [sku, qty] of Object.entries(stock)) {
-      const prod = PRODUCTS.find((p) => p[0] === sku);
-      await db.query('INSERT INTO purchase_order_items (po_id,product_id,quantity,unit_cost) VALUES ($1,$2,$3,$4)', [po[0].id, P[sku], qty, prod[5]]);
-      if (prod[3]) for (let i = 0; i < qty; i++) {
-        await db.query('INSERT INTO inventory_units (product_id, serial_no, po_id) VALUES ($1,$2,$3)', [P[sku], `SP-${sku.replace(/-/g, '')}-${String(++sn).padStart(6, '0')}`, po[0].id]);
+    // ------------------------------------------------------------ build the deals
+    const deals = PLAN.map(([iso, stage], i) => {
+      const [name, city] = NAMES[i];
+      const kw = KWS[i % KWS.length];
+      const type = i % 4 === 3 ? 'off_grid' : 'on_grid';
+      const slug = name.toLowerCase().replace(/[^a-z]+/g, '.');
+      return {
+        i, name, city, kw, type, stage, d0: at(iso, 10, 30), iso,
+        rank: stage === 'lost' ? -1 : RANK[stage],
+        phone: `98250${10001 + i}`, email: `${slug}@example.com`,
+        address: `${12 + i * 3}, ${SOCIETIES[i % SOCIETIES.length]}`,
+        subsidy: type === 'on_grid' && i % 3 !== 2,
+        source: SOURCES[i % SOURCES.length],
+        sales: salesIds[i % 2], tech: techs[i % 3],
+        discount: i % 5 === 4,
+      };
+    });
+
+    // ------------------------------------------------------------ purchase orders sized to what gets shipped
+    const PO_DATES = ['2026-06-01', '2026-08-05', '2026-10-02'];
+    const needs = [];
+    for (const d of deals) {
+      if (d.rank < RANK.ready) continue;
+      const when = d.rank >= RANK.dispatched ? ymd(plus(d.d0, 12)) : '2099-01-01'; // 'ready' orders will ship later
+      for (const [sku, n] of bom(d.type, d.kw)) if (sku !== 'SVC-INSTALL') needs.push({ when, sku, n });
+    }
+    const BUFFER = { 'PNL-540': 14, 'INV-1K': 2, 'INV-2K': 2, 'INV-3K': 3, 'INV-4K': 1, 'INV-5K': 0, 'BAT-150': 0, 'MPPT-40A': 2, 'MPPT-60A': 3 };
+    const window = (k) => needs.filter((x) => x.when >= PO_DATES[k] && (k === 2 || x.when < PO_DATES[k + 1]));
+    const supplier = await q("INSERT INTO suppliers (name, phone) VALUES ('Sunrise Distributors Pvt Ltd','9825012345'), ('GreenVolt Components','9898098980') RETURNING id");
+    const counters = {};
+    const stockSummary = {};
+    for (let k = 0; k < PO_DATES.length; k++) {
+      const need = {};
+      for (const x of window(k)) need[x.sku] = (need[x.sku] || 0) + x.n;
+      const receivedAt = plus(at(PO_DATES[k], 12), 3);
+      const po = await q1("INSERT INTO purchase_orders (supplier_id, status, ordered_at, received_at, created_by) VALUES ($1,'received',$2,$3,$4) RETURNING id",
+        [supplier[k % 2].id, at(PO_DATES[k], 12), receivedAt, U.warehouse]);
+      for (const [sku, , , tracked, , cost] of PRODUCTS) {
+        if (sku === 'SVC-INSTALL') continue;
+        let qty = need[sku] || 0;
+        if (k === 0) qty += (tracked ? BUFFER[sku] ?? 0 : Math.ceil(qty * 0.25) + 5); // opening stock cushion
+        else if (k === 2) qty += tracked ? 0 : Math.ceil(qty * 0.25) + 5;
+        if (tracked && k === 2) qty += 0;
+        if (qty <= 0) continue;
+        await db.query('INSERT INTO purchase_order_items (po_id,product_id,quantity,unit_cost) VALUES ($1,$2,$3,$4)', [po.id, P[sku], qty, cost]);
+        if (tracked) {
+          const prefix = PRODUCTS.find((p) => p[0] === sku)[8];
+          for (let n = 0; n < qty; n++) {
+            counters[prefix] = (counters[prefix] || 0) + 1;
+            await db.query("INSERT INTO inventory_units (product_id, serial_no, po_id, created_at) VALUES ($1,$2,$3,$4)", [P[sku], `${prefix}-${String(counters[prefix]).padStart(3, '0')}`, po.id, receivedAt]);
+          }
+        }
+        await db.query("INSERT INTO stock_movements (product_id, qty, reason, ref_type, ref_id, created_by, created_at) VALUES ($1,$2,'purchase','po',$3,$4,$5)", [P[sku], qty, po.id, U.warehouse, receivedAt]);
+        stockSummary[sku] = (stockSummary[sku] || 0) + qty;
       }
-      await db.query(`INSERT INTO stock_movements (product_id, qty, reason, ref_type, ref_id, created_by) VALUES ($1,$2,'purchase','po',$3,$4)`, [P[sku], qty, po[0].id, U.warehouse]);
     }
 
-    // ---- helpers for pipeline records
-    const mkEnquiry = async (name, phone, kw, type, status, extra = {}) => {
-      const { rows } = await db.query(
+    // ------------------------------------------------------------ helpers
+    const act = (entity, id, action, userId, detail, when) =>
+      db.query('INSERT INTO activity_log (entity, entity_id, action, user_id, detail, created_at) VALUES ($1,$2,$3,$4,$5::jsonb,$6)',
+        [entity, id, action, userId, detail ? JSON.stringify(detail) : null, when]);
+
+    const dispatchUnits = async (orderId, dispatchId, customerId, items, when) => {
+      for (const [sku, n] of items) {
+        if (sku === 'SVC-INSTALL') continue;
+        if (price[sku].tracked) {
+          const units = await q("SELECT id FROM inventory_units WHERE product_id = $1 AND status = 'in_stock' ORDER BY id LIMIT $2", [P[sku], n]);
+          if (units.length < n) throw new Error(`Seed bug: not enough ${sku} in stock (${units.length}/${n})`);
+          for (const u of units) {
+            await db.query("UPDATE inventory_units SET status='dispatched', dispatch_id=$2, order_id=$3, customer_id=$4 WHERE id=$1", [u.id, dispatchId, orderId, customerId]);
+            await db.query("INSERT INTO stock_movements (product_id, qty, reason, ref_type, ref_id, created_by, created_at) VALUES ($1,-1,'dispatch','dispatch',$2,$3,$4)", [P[sku], dispatchId, U.warehouse, when]);
+          }
+        } else {
+          await db.query("INSERT INTO stock_movements (product_id, qty, reason, ref_type, ref_id, created_by, created_at) VALUES ($1,$2,'dispatch','dispatch',$3,$4,$5)", [P[sku], -n, dispatchId, U.warehouse, when]);
+        }
+      }
+    };
+
+    // ------------------------------------------------------------ run every deal in date order
+    const delivered = []; // deals whose equipment is installed, used for tickets
+    for (const d of deals) {
+      const items = bom(d.type, d.kw);
+      const lost = d.stage === 'lost';
+      const rank = d.rank;
+
+      // enquiry
+      const checklist = rank >= 2 || lost;
+      const enq = await q1(
         `INSERT INTO enquiries (customer_name, phone, email, address, city, requested_kw, system_type, subsidy_required, source, status, assigned_to,
-                                shadow_free_sqft, monthly_bill, grid_suitable, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now() - ($15 || ' days')::interval) RETURNING id`,
-        [name, phone, extra.email || null, extra.address || '12 Shanti Nagar, Near Water Tank', extra.city || 'Ahmedabad', kw, type, extra.subsidy ?? false,
-         extra.source || 'web', status, extra.assignee || U.sales, extra.sqft ?? null, extra.bill ?? null, extra.grid ?? null, String(extra.daysAgo ?? 1)]);
-      return rows[0].id;
-    };
-    const mkSurvey = async (enquiryId, techKey, status, daysAhead = 1) => {
-      await db.query(
-        `INSERT INTO surveys (enquiry_id, technician_id, scheduled_date, status, roof_direction, roof_tilt_deg, cable_distance_m, usable_area_sqft, completed_at, reviewed_by)
-         VALUES ($1,$2, current_date + $3::int, $4, $5, $6, $7, $8, $9, $10)`,
-        [enquiryId, U[techKey], daysAhead, status, status === 'scheduled' ? null : 'S', status === 'scheduled' ? null : 18, status === 'scheduled' ? null : 22,
-         status === 'scheduled' ? null : 420, status === 'scheduled' ? null : new Date(), ['approved', 'rejected'].includes(status) ? U.sales : null]);
-    };
-    const mkQuote = async (enquiryId, pkgId, status, createdDaysAgo = 1) => {
-      const { rows: items } = await db.query(`SELECT p.id, p.name, p.sell_price, p.cost_price, pi.quantity FROM package_items pi JOIN products p ON p.id = pi.product_id WHERE package_id = $1`, [pkgId]);
-      const subtotal = items.reduce((s, i) => s + i.sell_price * i.quantity, 0);
-      const tax = Math.round(subtotal * 0.05 * 100) / 100;
-      const { rows } = await db.query(
-        `INSERT INTO quotes (enquiry_id, package_id, status, subtotal, tax_percent, tax_amount, total, valid_until, created_by, created_at)
-         VALUES ($1,$2,$3,$4,5,$5,$6, current_date + 15, $7, now() - ($8 || ' days')::interval) RETURNING id`,
-        [enquiryId, pkgId, status, subtotal, tax, subtotal + tax, U.sales, String(createdDaysAgo)]);
-      for (const i of items) await db.query('INSERT INTO quote_items (quote_id,product_id,description,quantity,unit_price,unit_cost) VALUES ($1,$2,$3,$4,$5,$6)', [rows[0].id, i.id, i.name, i.quantity, i.sell_price, i.cost_price]);
-      return rows[0].id;
-    };
+                                shadow_free_sqft, monthly_bill, grid_suitable, qualification_notes, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+        [d.name, d.phone, d.email, d.address, d.city, d.kw, d.type, d.subsidy, d.source, lost ? 'lost' : rank >= 6 ? 'won' : ENQ_STATUS[d.stage], d.sales,
+          checklist ? d.kw * 140 + 40 : null, checklist ? d.kw * 850 : null, checklist ? !lost : null, lost ? 'Roof is shaded most of the day. Not suitable.' : null, d.d0]);
+      d.enqId = enq.id;
+      await act('enquiry', enq.id, 'created', null, { source: d.source }, d.d0);
+      if (rank >= 1 || lost) await act('enquiry', enq.id, 'call_logged:contacted', d.sales, null, plus(d.d0, 0, 15));
+      if (rank >= 2) await act('enquiry', enq.id, 'call_logged:qualified', d.sales, null, plus(d.d0, 1, 12));
+      if (lost) await act('enquiry', enq.id, 'call_logged:not_suitable', d.sales, { notes: 'Roof is shaded' }, plus(d.d0, 1, 12));
 
-    // ---- live sales pipeline
-    await mkEnquiry('Hetal Shah', '9879012345', 3, 'on_grid', 'new', { subsidy: true, email: 'hetal.shah@example.com', daysAgo: 0 });
-    await mkEnquiry('Mahesh Desai', '9825566778', 2, 'on_grid', 'contacted', { daysAgo: 1 });
-    await mkEnquiry('Pooja Mehta', '9898123456', 4, 'off_grid', 'qualified', { sqft: 520, bill: 7800, grid: true, daysAgo: 2 });
-    const e4 = await mkEnquiry('Vijay Trivedi', '9727345678', 5, 'on_grid', 'survey_scheduled', { sqft: 700, bill: 15000, grid: true, daysAgo: 3, subsidy: true });
-    await mkSurvey(e4, 'tech1', 'scheduled', 1);
-    const e5 = await mkEnquiry('Anita Joshi', '9909234567', 3, 'on_grid', 'survey_approved', { sqft: 450, bill: 6200, grid: true, daysAgo: 5, subsidy: true });
-    await mkSurvey(e5, 'tech2', 'approved', -2);
-    const e6 = await mkEnquiry('Bhavesh Patel Engineering', '9374012345', 5, 'off_grid', 'quoted', { sqft: 900, bill: 24000, grid: true, daysAgo: 7, address: 'Plot 44, GIDC Vatva' });
-    await mkSurvey(e6, 'tech3', 'approved', -4);
-    await mkQuote(e6, PK.off_grid_5, 'sent', 2);
+      // survey
+      if (rank >= 3) {
+        const done = rank >= 4;
+        const date = ymd(done ? plus(d.d0, 3) : plus(d.d0, 6));
+        await db.query(
+          `INSERT INTO surveys (enquiry_id, technician_id, scheduled_date, status, roof_direction, roof_tilt_deg, cable_distance_m, usable_area_sqft, reviewed_by, completed_at, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [enq.id, d.tech, date, done ? 'approved' : 'scheduled', done ? DIRS[d.i % 5] : null, done ? 15 + (d.i % 4) * 3 : null, done ? 14 + (d.i % 6) * 3 : null,
+            done ? d.kw * 140 + 40 : null, done ? d.sales : null, done ? plus(d.d0, 3, 15) : null, plus(d.d0, 1, 13)]);
+        await act('enquiry', enq.id, 'survey_scheduled', d.sales, null, plus(d.d0, 1, 13));
+        if (done) {
+          await act('enquiry', enq.id, 'survey_submitted', d.tech, null, plus(d.d0, 3, 15));
+          await act('enquiry', enq.id, 'survey_approved', d.sales, null, plus(d.d0, 3, 17));
+        }
+      }
 
-    // ---- an order waiting for the advance payment
-    const e7 = await mkEnquiry('Kalpesh Rana', '9879654321', 2, 'on_grid', 'quoted', { sqft: 300, bill: 4200, grid: true, daysAgo: 6, subsidy: true, source: 'whatsapp' });
-    await mkSurvey(e7, 'tech1', 'approved', -3);
-    const q7 = await mkQuote(e7, PK.on_grid_2, 'sent', 3);
-    // ---- an order that is paid & confirmed: warehouse must pack, crew is scheduled
-    const e8 = await mkEnquiry('Nisha Kapadia', '9825099887', 3, 'off_grid', 'quoted', { sqft: 480, bill: 9100, grid: true, daysAgo: 8, source: 'call' });
-    await mkSurvey(e8, 'tech2', 'approved', -5);
-    const q8 = await mkQuote(e8, PK.off_grid_3, 'sent', 4);
+      // quote
+      if (rank >= 5) {
+        const pkgId = PK[`${d.type}_${d.kw}`];
+        const subtotal = round2(items.reduce((s, [sku, n]) => s + price[sku].sell * n, 0));
+        const discount = d.discount ? Math.round(subtotal * 0.03) : 0;
+        const tax = round2((subtotal - discount) * 0.05);
+        const total = round2(subtotal - discount + tax);
+        d.money = { subtotal, discount, tax, total };
+        const quote = await q1(
+          `INSERT INTO quotes (enquiry_id, package_id, status, subtotal, discount, tax_percent, tax_amount, total, valid_until, created_by, created_at)
+           VALUES ($1,$2,$3,$4,$5,5,$6,$7,$8,$9,$10) RETURNING id`,
+          [enq.id, pkgId, rank === 5 ? 'sent' : 'accepted', subtotal, discount, tax, total, ymd(plus(d.d0, 20)), d.sales, plus(d.d0, 5, 11)]);
+        for (const [sku, n] of items) await db.query('INSERT INTO quote_items (quote_id,product_id,description,quantity,unit_price,unit_cost) VALUES ($1,$2,$3,$4,$5,$6)', [quote.id, P[sku], price[sku].name, n, price[sku].sell, price[sku].cost]);
+        await act('enquiry', enq.id, 'quote_created', d.sales, { quoteId: quote.id, total }, plus(d.d0, 5, 11));
+        await act('enquiry', enq.id, 'quote_sent', d.sales, { quoteId: quote.id }, plus(d.d0, 5, 16));
+        d.quoteId = quote.id;
+      }
 
-    // ---- historical installations (for the warranty / support story)
-    const history = async (name, phone, kw, type, monthsAgo, city, hours) => {
-      const e = await mkEnquiry(name, phone, kw, type, 'won', { sqft: 400, bill: 5000, grid: true, daysAgo: monthsAgo * 30 + 20, city });
-      await mkSurvey(e, 'tech1', 'approved', -monthsAgo * 30 - 15);
-      const q = await mkQuote(e, PK[`${type}_${kw}`], 'accepted', monthsAgo * 30 + 12);
-      const { rows: cu } = await db.query(`INSERT INTO customers (name, phone, address, city) VALUES ($1,$2,'Historic Customer Address, Satellite',$3) RETURNING id`, [name, phone, city]);
-      await db.query('UPDATE enquiries SET customer_id = $2 WHERE id = $1', [e, cu[0].id]);
-      const { rows: qt } = await db.query('SELECT * FROM quotes WHERE id = $1', [q]);
-      const ageSql = `now() - interval '${monthsAgo} months'`;
-      const { rows: o } = await db.query(`INSERT INTO orders (quote_id, customer_id, status, total, confirmed_at, completed_at, created_at) VALUES ($1,$2,'completed',$3, ${ageSql} - interval '10 days', ${ageSql} + interval '3 days', ${ageSql} - interval '12 days') RETURNING id`, [q, cu[0].id, qt[0].total]);
-      await db.query('INSERT INTO order_items (order_id,product_id,quantity,unit_price,unit_cost) SELECT $1, product_id, quantity, unit_price, unit_cost FROM quote_items WHERE quote_id = $2', [o[0].id, q]);
-      const { rows: inv } = await db.query(`INSERT INTO invoices (kind, order_id, customer_id, status, subtotal, tax_amount, total, issued_at) VALUES ('order',$1,$2,'paid',$3,$4,$5, (${ageSql} - interval '12 days')::date) RETURNING id`, [o[0].id, cu[0].id, qt[0].subtotal, qt[0].tax_amount, qt[0].total]);
-      await db.query('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price) SELECT $1, description, quantity, unit_price FROM quote_items WHERE quote_id = $2', [inv[0].id, q]);
-      await db.query(`INSERT INTO payments (invoice_id, amount, method, received_by, paid_at) VALUES ($1,$2,'bank_transfer',$3, ${ageSql} - interval '10 days'), ($1,$4,'upi',$3, ${ageSql} + interval '3 days')`,
-        [inv[0].id, Math.round(qt[0].total * 0.4), U.sales, qt[0].total - Math.round(qt[0].total * 0.4)]);
-      const { rows: d } = await db.query(`INSERT INTO dispatches (order_id, status, vehicle_no, dispatched_at) VALUES ($1,'dispatched','GJ01AB1234', ${ageSql}) RETURNING id`, [o[0].id]);
-      const { rows: items } = await db.query('SELECT oi.*, p.tracked_serial FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE order_id = $1', [o[0].id]);
-      for (const it of items) {
-        const { rows: pr } = await db.query('SELECT sku, category FROM products WHERE id = $1', [it.product_id]);
-        if (pr[0].category === 'service') continue;
-        if (it.tracked_serial) {
-          for (let i = 0; i < it.quantity; i++) {
-            await db.query(`INSERT INTO inventory_units (product_id, serial_no, status, dispatch_id, order_id, customer_id) VALUES ($1,$2,'dispatched',$3,$4,$5)`,
-              [it.product_id, `HX-${pr[0].sku.replace(/-/g, '')}-${phone.slice(-4)}${i}`, d[0].id, o[0].id, cu[0].id]);
+      // order, invoice, subsidy
+      if (rank >= 6) {
+        const orderAt = plus(d.d0, 8, 11);
+        const cust = await q1('INSERT INTO customers (name, phone, email, address, city, created_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id', [d.name, d.phone, d.email, d.address, d.city, orderAt]);
+        d.custId = cust.id;
+        await db.query('UPDATE enquiries SET customer_id = $2 WHERE id = $1', [enq.id, cust.id]);
+        const confirmed = rank >= 7;
+        const statusByRank = { 6: 'pending_payment', 7: 'confirmed', 8: 'dispatched', 9: 'delivered', 10: 'completed' };
+        const order = await q1(
+          'INSERT INTO orders (quote_id, customer_id, status, total, confirmed_at, completed_at, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+          [d.quoteId, cust.id, statusByRank[rank], d.money.total, confirmed ? plus(d.d0, 9, 12) : null, rank >= 10 ? plus(d.d0, 15, 17) : null, orderAt]);
+        d.orderId = order.id;
+        await db.query('INSERT INTO order_items (order_id,product_id,quantity,unit_price,unit_cost) SELECT $1, product_id, quantity, unit_price, unit_cost FROM quote_items WHERE quote_id = $2', [order.id, d.quoteId]);
+        await act('order', order.id, 'created', d.sales, { quoteId: d.quoteId }, orderAt);
+
+        const advance = Math.round(d.money.total * (0.3 + 0.05 * (d.i % 3)));
+        const fullyPaid = rank >= 10;
+        const invStatus = !confirmed ? 'sent' : fullyPaid ? 'paid' : 'partially_paid';
+        const inv = await q1(
+          `INSERT INTO invoices (kind, order_id, customer_id, status, subtotal, tax_amount, total, issued_at, due_date, created_at)
+           VALUES ('order',$1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+          [order.id, cust.id, invStatus, d.money.subtotal - d.money.discount, d.money.tax, d.money.total, ymd(orderAt), ymd(plus(orderAt, 15)), orderAt]);
+        await db.query('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price) SELECT $1, description, quantity, unit_price FROM quote_items WHERE quote_id = $2', [inv.id, d.quoteId]);
+        if (d.money.discount > 0) await db.query("INSERT INTO invoice_items (invoice_id, description, quantity, unit_price) VALUES ($1,'Discount',1,$2)", [inv.id, -d.money.discount]);
+
+        if (d.subsidy) {
+          const ageDays = (new Date(`${TODAY}T12:00:00+05:30`) - orderAt) / DAY;
+          const st = ageDays > 80 ? 'disbursed' : ageDays > 50 ? 'approved' : ageDays > 25 ? 'submitted' : 'documents_pending';
+          const expected = subsidyFor(d.kw);
+          await db.query(
+            `INSERT INTO subsidy_applications (order_id, status, expected_amount, approved_amount, reference_no, submitted_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [order.id, st, expected, ['approved', 'disbursed'].includes(st) ? expected : null, st === 'documents_pending' ? null : `PMSG-2026-${String(70000 + d.i)}`,
+              st === 'documents_pending' ? null : ymd(plus(orderAt, 10)), plus(orderAt, st === 'disbursed' ? 60 : 12)]);
+        }
+
+        if (confirmed) {
+          const payAt = plus(d.d0, 9, 12);
+          await db.query('INSERT INTO payments (invoice_id, amount, method, reference, received_by, paid_at) VALUES ($1,$2,$3,$4,$5,$6)',
+            [inv.id, advance, METHODS[d.i % 5], `ADV-${String(1000 + d.i)}`, d.sales, payAt]);
+          await act('order', order.id, 'confirmed', d.sales, { advancePercent: 30 }, payAt);
+
+          const disp = await q1("INSERT INTO dispatches (order_id, created_at) VALUES ($1,$2) RETURNING id", [order.id, payAt]);
+          d.dispId = disp.id;
+          const job = await q1("INSERT INTO installation_jobs (order_id, status, scheduled_date, created_at) VALUES ($1,'scheduled',$2,$3) RETURNING id", [order.id, rank >= 9 && rank < 10 ? '2026-11-23' : ymd(plus(d.d0, 12)), payAt]);
+          d.jobId = job.id;
+          await db.query('INSERT INTO job_crew (job_id, user_id) VALUES ($1,$2)', [job.id, d.tech]);
+          if (d.i % 2 === 0) await db.query('INSERT INTO job_crew (job_id, user_id) VALUES ($1,$2)', [job.id, techs[(d.i + 1) % 3]]);
+
+          if (rank >= 8) {
+            const shipAt = plus(d.d0, 12, 10);
+            await dispatchUnits(order.id, disp.id, cust.id, items, shipAt);
+            await db.query("UPDATE dispatches SET status='dispatched', vehicle_no=$2, dispatched_at=$3 WHERE id=$1", [disp.id, `GJ0${1 + (d.i % 9)}AB${1200 + d.i}`, shipAt]);
+            await act('order', order.id, 'dispatched', U.warehouse, { vehicle: `GJ0${1 + (d.i % 9)}AB${1200 + d.i}` }, shipAt);
+          }
+          if (rank >= 9) {
+            const arrive = plus(d.d0, 13, 11);
+            await db.query("UPDATE dispatches SET status='delivered', delivered_at=$2 WHERE id=$1", [disp.id, arrive]); // trigger starts every warranty clock
+            await act('order', order.id, 'delivered', U.warehouse, null, arrive);
+          }
+          if (rank >= 10) {
+            const finish = plus(d.d0, 15, 16);
+            const start = new Date(finish.getTime() - (5 + (d.i % 5)) * 3600e3);
+            await db.query(
+              `UPDATE installation_jobs SET status='completed', started_at=$2, finished_at=$3, confirmed_kw=$4, signer_name=$5, signature_data=$6, signed_at=$3 WHERE id=$1`,
+              [job.id, start, finish, d.kw, d.name, 'data:image/png;base64,iVBORw0KGgo=']);
+            await act('order', order.id, 'installation_signed_off', d.tech, { confirmedKw: d.kw }, finish);
+            await db.query('INSERT INTO payments (invoice_id, amount, method, reference, received_by, paid_at) VALUES ($1,$2,$3,$4,$5,$6)',
+              [inv.id, round2(d.money.total - advance), METHODS[(d.i + 1) % 5], `BAL-${String(2000 + d.i)}`, d.sales, plus(d.d0, 20, 14)]);
+            delivered.push(d);
           }
         }
       }
-      // delivery fires the DB trigger that starts every warranty clock
-      await db.query(`UPDATE dispatches SET status = 'delivered', delivered_at = ${ageSql} + interval '1 day' WHERE id = $1`, [d[0].id]);
-      const { rows: j } = await db.query(
-        `INSERT INTO installation_jobs (order_id, status, scheduled_date, started_at, finished_at, confirmed_kw, signer_name, signature_data, signed_at)
-         VALUES ($1,'completed', (${ageSql})::date, ${ageSql} + interval '3 days' - interval '${hours} hours', ${ageSql} + interval '3 days', $2, $3, 'data:image/png;base64,iVBORw0KGgo=', ${ageSql} + interval '3 days') RETURNING id`,
-        [o[0].id, kw, name]);
-      await db.query('INSERT INTO job_crew (job_id, user_id) VALUES ($1,$2), ($1,$3)', [j[0].id, U.tech1, U.tech2]);
-      return o[0].id;
-    };
-    await history('Ramesh Parmar', '9824111222', 3, 'on_grid', 18, 'Surat', 9);      // inverter still in warranty
-    await history('Dhruv Solanki', '9825333444', 2, 'off_grid', 30, 'Vadodara', 14); // inverter / battery expired, panels in warranty
-    await history('Smita Bhatt', '9426555666', 1, 'on_grid', 2, 'Ahmedabad', 5);     // recent job
+    }
 
-    // Tickets: one in warranty, one out
-    const unit = async (phone, sku) => (await db.query(
-      `SELECT u.id, u.customer_id FROM inventory_units u JOIN customers c ON c.id = u.customer_id JOIN products p ON p.id = u.product_id WHERE c.phone = $1 AND p.sku = $2 LIMIT 1`, [phone, sku])).rows[0];
-    const inW = await unit('9824111222', 'INV-3K');
-    await db.query(`INSERT INTO tickets (customer_id, unit_id, subject, description, fault_code, priority, warranty_status, created_by)
-                    VALUES ($1,$2,'Inverter showing fault code E-04, zero power','Heavy rain last night, no generation since morning','E04','urgent','in_warranty',$3)`, [inW.customer_id, inW.id, U.support]);
-    const outW = await unit('9825333444', 'BAT-150');
-    await db.query(`INSERT INTO tickets (customer_id, unit_id, subject, description, priority, warranty_status, created_by)
-                    VALUES ($1,$2,'Battery not holding charge','Backup lasts under 30 minutes','normal','out_of_warranty',$3)`, [outW.customer_id, outW.id, U.support]);
+    // ------------------------------------------------------------ service tickets (all on equipment that is in warranty)
+    const done = delivered;
+    const unitOf = async (deal, sku) => q1('SELECT id, serial_no FROM inventory_units WHERE order_id = $1 AND product_id = $2 ORDER BY id LIMIT 1', [deal.orderId, P[sku]]);
+    const TICKETS = [
+      // [deal index in `done`, sku, subject, priority, status, daysAfterDelivery, fault code, resolution]
+      [3, null, 'Inverter shows fault E04, no power', 'urgent', 'closed', 38, 'E04', 'Reset the DC input and replaced a loose MC4 connector.'],
+      [8, null, 'Inverter display is blank after a power cut', 'normal', 'closed', 22, null, 'Display cable reseated and firmware refreshed.'],
+      [12, null, 'Generation not visible in the mobile app', 'low', 'open', 14, null, null],
+      [13, 'PNL-540', 'Cracked cover on a panel junction box', 'normal', 'open', 9, null, null],
+      [15, null, 'Inverter beeps continuously in the evening', 'high', 'assigned', 6, 'E12', null],
+      [14, null, 'Earthing alarm after heavy rain', 'normal', 'resolved', 8, 'E21', 'Earthing pit re-soaked and clamps tightened.'],
+    ];
+    for (const [idx, sku, subject, priority, status, after, code, resolution] of TICKETS) {
+      const deal = done[Math.min(idx, done.length - 1)];
+      const invSku = sku || `INV-${deal.kw}K`;
+      const unit = await unitOf(deal, invSku);
+      const opened = plus(deal.d0, 13 + after, 10);
+      if (opened > new Date(`${TODAY}T20:00:00+05:30`)) continue;
+      const assignee = status === 'open' ? null : status === 'assigned' ? U.tech1 : U.support;
+      const t = await q1(
+        `INSERT INTO tickets (customer_id, unit_id, subject, description, fault_code, priority, status, warranty_status, assigned_to, resolution, resolved_at, customer_confirmed_at, created_by, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'in_warranty',$8,$9,$10,$11,$12,$13) RETURNING id`,
+        [deal.custId, unit.id, subject, 'Reported by the customer over the phone.', code, priority, status, assignee, resolution,
+          ['resolved', 'closed'].includes(status) ? plus(opened, 2, 15) : null, status === 'closed' ? plus(opened, 4, 12) : null, U.support, opened]);
+      await act('ticket', t.id, 'created', U.support, { warranty: 'in_warranty' }, opened);
+      if (['resolved', 'closed'].includes(status)) {
+        await db.query("INSERT INTO ticket_lines (ticket_id, description, quantity, unit_price, unit_cost, is_labour) VALUES ($1,'Technician visit and testing',1,500,0,true)", [t.id]);
+        await db.query('INSERT INTO ticket_lines (ticket_id, product_id, description, quantity, unit_price, unit_cost, is_labour) VALUES ($1,$2,$3,2,120,80,false)', [t.id, P['MC4'], 'MC4 Connector Pair']);
+        await act('ticket', t.id, 'resolved', U.support, { free: true }, plus(opened, 2, 15));
+      }
+    }
 
-    // Create the two live orders through the real service logic
+    // ------------------------------------------------------------ technician payouts (Jun to Oct paid, November pending)
+    await db.query(
+      `INSERT INTO technician_payouts (user_id, period_month, hours, amount, status, paid_at)
+       SELECT u.id, date_trunc('month', j.finished_at)::date, COALESCE(SUM(l.hours),0), COALESCE(SUM(l.hours * u.hourly_rate),0),
+              CASE WHEN date_trunc('month', j.finished_at) < date '2026-11-01' THEN 'paid'::payout_status ELSE 'pending'::payout_status END,
+              CASE WHEN date_trunc('month', j.finished_at) < date '2026-11-01' THEN (date_trunc('month', j.finished_at) + interval '1 month' + interval '5 days') END
+         FROM users u JOIN job_crew c ON c.user_id = u.id
+         JOIN installation_jobs j ON j.id = c.job_id AND j.status = 'completed'
+         JOIN v_job_labour l ON l.job_id = j.id
+        WHERE u.role = 'technician' GROUP BY u.id, date_trunc('month', j.finished_at)`);
+
+    // ------------------------------------------------------------ what to scan next
+    const ready = deals.filter((d) => d.rank === RANK.ready);
+    const next = {};
+    for (const [sku, , , tracked, , , , , prefix] of PRODUCTS) {
+      if (!tracked) continue;
+      const rows = await q("SELECT serial_no FROM inventory_units WHERE product_id = $1 AND status = 'in_stock' ORDER BY id LIMIT 3", [P[sku]]);
+      next[sku] = rows.map((r) => r.serial_no);
+    }
+    return { deals: deals.length, ready: ready.map((d) => `${d.name} (${d.phone})`), next, counters };
   });
 
-  // Orders go through the same service code the API uses
-  const { rows: q } = await pool.query(`SELECT id, enquiry_id FROM quotes WHERE status = 'sent' ORDER BY id`);
-  const [salesRow] = (await pool.query(`SELECT id FROM users WHERE email = 'sales@sunpower.test'`)).rows;
-  const byEnq = async (name) => (await pool.query(`SELECT q.id FROM quotes q JOIN enquiries e ON e.id = q.enquiry_id WHERE e.customer_name = $1`, [name])).rows[0].id;
-  await ordersService.createFromQuote(await byEnq('Kalpesh Rana'), salesRow.id);
-  const o8 = await ordersService.createFromQuote(await byEnq('Nisha Kapadia'), salesRow.id);
-  await tx(async (db) => {
-    const { rows: inv } = await db.query('SELECT id, total FROM invoices WHERE order_id = $1', [o8.id]);
-    await db.query(`INSERT INTO payments (invoice_id, amount, method, reference, received_by) VALUES ($1,$2,'upi','UPI-DEMO-1001',$3)`, [inv[0].id, Math.round(inv[0].total * 0.4), salesRow.id]);
-    await db.query(`UPDATE invoices SET status = 'partially_paid' WHERE id = $1`, [inv[0].id]);
-  });
-  await prismaTx(async (pdb) => {
-    await ordersService.confirm(pdb, o8.id, salesRow.id);
-  });
-  void q;
-
-  console.log('Seed complete.');
-  console.log(`Login with any of: ${STAFF.map((s) => s[1]).join(', ')}\nPassword for all: ${PASSWORD}`);
+  console.log('Seed complete: 6 months of data (June to 21 November 2026).');
+  console.log(`Customer journeys: ${summary.deals}. Customer mobile numbers: 9825010001 ... 98250100${String(summary.deals).padStart(2, '0')}`);
+  console.log('Orders waiting for the warehouse to scan:', summary.ready.join('; '));
+  console.log('Next serials to scan (lowest number still in stock):');
+  for (const [sku, list] of Object.entries(summary.next)) console.log(`  ${sku.padEnd(9)} ${list.join(', ')}`);
+  console.log(`Logins: ${STAFF.map((s) => s[1]).join(', ')}\nPassword for all: ${PASSWORD}`);
 }
 
-main().then(() => Promise.all([pool.end(), prisma.$disconnect()])).catch((e) => { console.error(e); pool.end(); prisma.$disconnect(); process.exit(1); });
+main().then(() => pool.end()).catch((e) => { console.error(e); pool.end(); process.exit(1); });
