@@ -2,6 +2,36 @@ import { z } from 'zod';
 
 export { z };
 
+/**
+ * Plain-language fallback messages. A schema that sets its own message always wins; this only
+ * replaces zod's technical defaults like "Expected number, received nan" or "Required".
+ */
+z.setErrorMap((issue, ctx) => {
+  switch (issue.code) {
+    case z.ZodIssueCode.invalid_type:
+      if (issue.received === 'undefined' || issue.received === 'null') return { message: 'This field is required' };
+      if (issue.expected === 'number' || issue.expected === 'integer') return { message: 'Enter a valid number' };
+      if (issue.expected === 'string') return { message: 'Enter text for this field' };
+      if (issue.expected === 'boolean') return { message: 'Choose yes or no' };
+      if (issue.expected === 'array') return { message: 'Add at least one item' };
+      return { message: 'This value is not valid' };
+    case z.ZodIssueCode.invalid_enum_value:
+      return { message: 'Choose one of the listed options' };
+    case z.ZodIssueCode.too_small:
+      if (issue.type === 'string') return { message: issue.minimum === 1 ? 'This field is required' : `Must be at least ${issue.minimum} characters` };
+      if (issue.type === 'array') return { message: 'Add at least one item' };
+      return { message: `Must be at least ${issue.minimum}` };
+    case z.ZodIssueCode.too_big:
+      if (issue.type === 'string') return { message: `Must be at most ${issue.maximum} characters` };
+      return { message: `Must be at most ${issue.maximum}` };
+    case z.ZodIssueCode.invalid_string:
+      if (issue.validation === 'email') return { message: 'Enter a valid email address (e.g. name@example.com)' };
+      return { message: 'This value is not in the right format' };
+    default:
+      return { message: ctx.defaultError };
+  }
+});
+
 // Reusable field validators with human-friendly messages -------------------
 
 const MARKUP = /[<>]/;
@@ -100,7 +130,7 @@ export const password = z
   .regex(/[A-Za-z]/, 'Password must contain a letter')
   .regex(/\d/, 'Password must contain a number');
 
-export const idParam = z.object({ id: z.coerce.number().int().positive('Invalid id') });
+export const idParam = z.object({ id: z.coerce.number({ invalid_type_error: 'Invalid id' }).int('Invalid id').positive('Invalid id').max(2147483647, 'Invalid id') });
 
 // Serial numbers: letters, digits, dashes; normalised to upper case
 export const serial = z

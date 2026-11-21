@@ -26,6 +26,17 @@ function fromDbError(err: any): HttpError | null {
       );
     case '22P02':
       return new HttpError(400, 'Malformed value in request');
+    case '22001':
+      return new HttpError(400, 'One of the entries is too long');
+    case '22003':
+      return new HttpError(400, 'A number is too large or too small');
+    case '22007':
+    case '22008':
+      return new HttpError(400, 'Enter a valid date');
+    case '23502':
+      return new HttpError(400, 'A required value is missing');
+    case '22021':
+      return new HttpError(400, 'The text contains characters that are not allowed');
     case 'P0001': {
       // RAISE EXCEPTION from our triggers: surfaced as the human-readable message
       const m = message.match(/message: "([^"]*)"/) ?? message.match(/ERROR: (.*)$/m);

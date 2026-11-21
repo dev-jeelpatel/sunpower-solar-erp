@@ -25,4 +25,10 @@ export function paging(query: Request['query']) {
 }
 
 /** Optional string query param ('' and missing both become null). */
-export const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+export const str = (v: unknown): string | null => {
+  if (typeof v !== 'string') return null;
+  // control characters (for example a NUL byte) cannot be stored or searched in PostgreSQL
+  // eslint-disable-next-line no-control-regex
+  const clean = v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 100);
+  return clean === '' ? null : clean;
+};

@@ -1,6 +1,14 @@
 // End-to-end smoke test of the whole business flow against a running API + seeded DB.
 // Usage: (server running)  node scripts/e2e.js   [API_URL=http://localhost:4000]
 const assert = require('node:assert/strict');
+
+// This test creates real records (customers, orders, stock...) in whatever database the API uses.
+// Run it only on a throwaway database, and say so explicitly: npm run e2e -- --confirm
+if (!process.argv.includes('--confirm')) {
+  console.error('Refusing to run: the end-to-end test writes test data into the current database.');
+  console.error('If this is a throwaway database, run:  npm run e2e -- --confirm');
+  process.exit(1);
+}
 const BASE = process.env.API_URL || 'http://localhost:4000/api';
 const PASSWORD = 'Sunpower@123';
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
