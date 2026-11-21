@@ -42,7 +42,7 @@ service tickets and profit reports. It also includes a customer-facing website.
 | Solutions | On-grid and off-grid packages with **live prices** from the database (cost prices are never exposed) |
 | Savings calculator | Type a monthly bill, pick 1-5 kW; shows bill after solar, monthly and yearly saving, subsidy and payback |
 | Subsidy | PM Surya Ghar assistance by system size and how the paperwork is handled |
-| Warranty check | Enter a serial number to see the product and warranty status (no customer details are returned) |
+| Warranty check | Two ways: **mobile number** (verified with a one-time code) shows every item the customer owns with days left, or a **serial number** shows one item. Neither returns personal details |
 | FAQ and footer | Common questions, links, **Staff login** |
 
 `/enquire` is a stand-alone enquiry page that can be shared on WhatsApp.
@@ -308,7 +308,7 @@ Interactive docs for the core endpoints: **`/api/docs`** (Swagger UI). Errors re
 |---|---|
 | Health | `GET /health` |
 | Auth | `POST /auth/login`, `GET /auth/me` |
-| Public (no login) | `POST /public/enquiries`, `GET /public/packages`, `GET /public/warranty/:serial` |
+| Public (no login) | `POST /public/enquiries`, `GET /public/packages`, `GET /public/warranty/:serial`, `POST /public/warranty/otp`, `POST /public/warranty/verify` |
 | Users | `GET /users`, `GET /users/all`, `POST /users`, `PATCH /users/:id` |
 | Enquiries | `GET /enquiries`, `POST /enquiries`, `GET /enquiries/:id`, `POST /enquiries/:id/qualify`, `POST /enquiries/:id/assign` |
 | Surveys | `GET /surveys`, `POST /surveys`, `POST /surveys/:id/complete`, `POST /surveys/:id/review` |
@@ -346,6 +346,7 @@ List endpoints accept `page`, `limit` (max 100) and filters such as `status` and
 - Role checks run on every write route on the server; the client menu only mirrors them.
 - All input is validated with Zod; all SQL is parameterised.
 - Helmet headers, CORS limited to `CORS_ORIGIN`, and rate limits: login 30 per 15 min, public enquiry form 20 per hour, public warranty check 30 per 15 min.
+- Mobile-number warranty check: a 6-digit one-time code (valid 5 minutes, 5 tries, one use, stored only as a hash). The request answer is identical for known and unknown numbers so the form cannot reveal who is a customer. Limits: 6 code requests per hour and 20 verifications per 15 minutes per device, and 30 seconds between codes for one number.
 - Installation photos: images only (JPG, PNG, WebP), 5 MB each, random server-side file names, and served only to signed-in users.
 - The production build refuses to start with the default `JWT_SECRET`.
 
@@ -375,6 +376,7 @@ and show live toasts (see next steps).
 | `UPLOAD_DIR` | `backend/uploads` | Where installation photos are stored |
 | `ADVANCE_PERCENT` | `30` | Percent of an order total that confirms it |
 | `GST_PERCENT` | `5` | Tax added to quotes and service bills |
+| `OTP_DEMO` | `true` outside production | Demo mode for the mobile-number warranty check: the one-time code is shown on screen instead of texted. In production it defaults to off and the check needs an SMS provider (see below) |
 
 Dev database helper only: `PGPORT` (default `5433`) and `PGDATABASE` (default `sunpower_ts`).
 The web dev server proxies `/api` and `/uploads` to `http://localhost:4000` (see `frontend/vite.config.ts`).
@@ -439,6 +441,7 @@ The script **creates its own records**, so run it on a development database. Re-
 - API responses are typed loosely on most frontend pages; shared response types would tighten this.
 - The Socket.IO server only emits the new-enquiry event, and the web app does not yet show live notifications.
 - The Swagger page documents the core endpoints; the table above lists every route.
+- The mobile-number warranty check needs an SMS provider in production. `sendSms()` in `backend/src/modules/public/otp.service.ts` is the one place to plug MSG91, Twilio or similar in. Until then the check works in demo mode only (`OTP_DEMO=true`) and the serial-number check works everywhere. Codes are kept in memory, which suits a single API instance.
 - Payments are recorded manually (cash, UPI, bank transfer, cheque, card). There is no payment-gateway integration.
 - There are no unit tests; confidence comes from the 73-check end-to-end script and the database rules.
 - Summary cards on list pages use the latest 100 records, which matters once a list grows beyond that.
