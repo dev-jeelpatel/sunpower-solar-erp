@@ -14,6 +14,8 @@ import { catalogRouter } from './modules/catalog/catalog.routes';
 import { customersRouter } from './modules/customers/customers.routes';
 import { enquiriesRouter, publicRouter } from './modules/enquiries/enquiries.routes';
 import { inventoryRouter } from './modules/inventory/inventory.routes';
+import { ordersRouter } from './modules/orders/orders.routes';
+import { quotesRouter } from './modules/quotes/quotes.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
@@ -49,6 +51,8 @@ app.use('/api/enquiries', enquiriesRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api', customersRouter);
 app.use('/api/inventory', inventoryRouter);
+app.use('/api/quotes', quotesRouter);
+app.use('/api/orders', ordersRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
