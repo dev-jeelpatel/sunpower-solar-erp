@@ -4,6 +4,7 @@ import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
 import { Tracker } from '../components/kit';
+import { Icon } from '../components/icons';
 import { validate, required, positive, personName, addressText, cityName, safeText, email as emailRule, phone as phoneRule } from '../validators';
 
 const FLOW = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won'];
@@ -177,7 +178,7 @@ export default function EnquiryDetail() {
       const toReview = e.surveys.find((s) => s.status === 'completed');
       return (
         <>
-          <PageHead crumb={<div className="crumb"><Link to="/enquiries">← Enquiries</Link></div>} title={e.customer_name} sub={`${e.phone}${e.email ? ' · ' + e.email : ''}`}
+          <PageHead crumb={<div className="crumb"><Link to="/enquiries">← Enquiries</Link></div>} title={e.customer_name} sub={<span className="contact-line"><a href={`tel:${e.phone}`}><Icon n="phone" />{e.phone}</a>{e.email && <a href={`mailto:${e.email}`}><Icon n="mail" />{e.email}</a>}<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${e.address}${e.city ? `, ${e.city}` : ''}`)}`} target="_blank" rel="noreferrer" className="addr-chip" title="Open in Maps"><Icon n="pin" />{e.address}{e.city ? `, ${e.city}` : ''}</a></span>}
             actions={sales && <>
               {['new', 'contacted', 'qualified'].includes(e.status) && <button className="btn secondary" onClick={() => setModal('qualify')}>📞 Log call</button>}
               {e.status === 'qualified' && <button className="btn" onClick={() => setModal('survey')}>Schedule survey</button>}
@@ -198,6 +199,7 @@ export default function EnquiryDetail() {
                   <dt>Address</dt><dd>{e.address}{e.city ? `, ${e.city}` : ''}</dd>
                   <dt>Message</dt><dd>{e.message || '-'}</dd>
                   <dt>Source</dt><dd style={{ textTransform: 'capitalize' }}>{label(e.source)}</dd>
+                  {e.customer_id && <><dt>Customer</dt><dd><Link to={`/customers?id=${e.customer_id}`}>Open customer record</Link></dd></>}
                   <dt>Assigned to</dt><dd>{e.assigned_name || 'Unassigned'}</dd>
                 </dl>
               </Card>

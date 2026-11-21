@@ -7,8 +7,10 @@ export const surveysRepository = {
   list: (technicianId: number | null, status: string | null) =>
     q(
       prisma,
-      `SELECT s.*, e.customer_name, e.address, e.city, e.requested_kw, e.system_type, t.name AS technician_name
+      `SELECT s.*, e.customer_name, e.phone, e.email, e.address, e.city, e.requested_kw, e.system_type, e.message AS customer_message,
+              t.name AS technician_name, sp.name AS sales_name, sp.phone AS sales_phone
          FROM surveys s JOIN enquiries e ON e.id = s.enquiry_id JOIN users t ON t.id = s.technician_id
+         LEFT JOIN users sp ON sp.id = e.assigned_to
         WHERE ($1::int IS NULL OR s.technician_id = $1) AND ($2::text IS NULL OR s.status::text = $2)
         ORDER BY s.scheduled_date DESC, s.id DESC LIMIT 200`,
       [technicianId, status],

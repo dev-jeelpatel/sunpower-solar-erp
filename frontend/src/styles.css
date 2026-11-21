@@ -927,3 +927,16 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .pcard-actions { display: inline-flex; gap: 6px; margin-left: 8px; }
 
 .gen-box { padding: 12px; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface-2); display: grid; gap: 8px; }
+
+/* survey: customer contact card */
+.contact-card { display: grid; gap: 12px; padding: 14px 16px; margin-bottom: 16px; border-radius: 14px; background: var(--primary-soft); border: 1px solid #dfe3fb; }
+.cc-row { display: flex; gap: 12px; align-items: flex-start; } .cc-row > svg { width: 18px; height: 18px; color: var(--primary-dark); flex: none; margin-top: 2px; }
+.cc-row b { display: block; } .cc-row small { display: block; color: var(--muted); font-size: .8rem; margin-top: 2px; }
+.cc-row a { font-weight: 650; }
+.cc-note { font-size: .88rem; padding: 8px 10px; border-radius: 10px; background: #fff; } .cc-sales { font-size: .85rem; color: var(--muted); }
+.addr { display: block; }
+.contact-line { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.contact-line a { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-dark); font-size: .78rem; font-weight: 650; text-decoration: none; white-space: nowrap; }
+.contact-line a:hover { background: #dfe3fb; text-decoration: none; }
+.contact-line svg { width: 13px; height: 13px; }
+.contact-line a.addr-chip { white-space: normal; border-radius: 12px; line-height: 1.35; padding: 4px 10px; }

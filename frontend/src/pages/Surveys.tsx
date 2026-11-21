@@ -7,6 +7,21 @@ import { Avatar, Chips, Kpi, KpiRow, Person, Tag, dueIn } from '../components/ki
 import { Icon } from '../components/icons';
 import { validate, required, range, positive } from '../validators';
 
+/** Where the customer is and how to reach them, so the technician can call from the doorstep. */
+const mapUrl = (s: any) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${s.address}${s.city ? `, ${s.city}` : ''}`)}`;
+
+function ContactCard({ s }: { s: any }) {
+  return (
+    <div className="contact-card">
+      <div className="cc-row"><Icon n="user" /><div><b>{s.customer_name}</b><small>{s.requested_kw} kW {s.system_type.replace('_', '-')}</small></div></div>
+      <div className="cc-row"><Icon n="phone" /><div><a href={`tel:${s.phone}`}>{s.phone}</a>{s.email && <small><a href={`mailto:${s.email}`}>{s.email}</a></small>}</div></div>
+      <div className="cc-row"><Icon n="pin" /><div>{s.address}{s.city ? `, ${s.city}` : ''}<small><a href={mapUrl(s)} target="_blank" rel="noreferrer">Open in Maps</a></small></div></div>
+      {s.customer_message && <div className="cc-note"><b>Customer note:</b> {s.customer_message}</div>}
+      {s.sales_name && <div className="cc-sales">Salesperson: <b>{s.sales_name}</b>{s.sales_phone && <> · <a href={`tel:${s.sales_phone}`}>{s.sales_phone}</a></>}</div>}
+    </div>
+  );
+}
+
 function SurveyForm({ s, onClose, onDone }) {
   const f = useForm({ roofDirection: '', roofTiltDeg: '', cableDistanceM: '', usableAreaSqft: '', notes: '' });
   const { run, busy, error } = useAction(f.setErrors);
@@ -20,7 +35,7 @@ function SurveyForm({ s, onClose, onDone }) {
   };
   return (
     <Modal title={`Survey: ${s.customer_name}`} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Submit survey</button></>}>
-      <p className="muted small" style={{ marginTop: 0 }}>{s.address}{s.city ? `, ${s.city}` : ''} · {s.requested_kw} kW {s.system_type.replace('_', '-')}</p>
+      <ContactCard s={s} />
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
         <Field label="Roof faces" required error={f.errors.roofDirection}><select {...f.bind('roofDirection')}><option value="">Select…</option>{['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'].map((d) => <option key={d}>{d}</option>)}</select></Field>
@@ -65,7 +80,12 @@ export default function Surveys() {
                     return (
                       <tr key={s.id}>
                         <td className="nowrap"><b>{fmtDate(s.scheduled_date)}</b>{s.status === 'scheduled' && <span className="sub-line" style={{ color: when.tone === 'rose' ? 'var(--bad)' : undefined }}>{when.text}</span>}</td>
-                        <td><Person name={s.customer_name} sub={`${s.address}${s.city ? `, ${s.city}` : ''}`} to={`/enquiries/${s.enquiry_id}`} /></td>
+                        <td><Person name={s.customer_name} to={`/enquiries/${s.enquiry_id}`} sub={<>
+                          <span className="addr">{s.address}{s.city ? `, ${s.city}` : ''}</span>
+                          <span className="contact-line">
+                            <a href={`tel:${s.phone}`} onClick={(e) => e.stopPropagation()}><Icon n="phone" />{s.phone}</a>
+                            <a href={mapUrl(s)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Icon n="pin" />Map</a>
+                          </span></>} /></td>
                         <td><span className="who"><Avatar name={s.technician_name} mini role="technician" />{s.technician_name}</span></td>
                         <td>{s.roof_direction ? (
                           <div className="tags"><Tag tone="blue">Faces {s.roof_direction}</Tag><Tag>{s.roof_tilt_deg}° tilt</Tag><Tag>{s.cable_distance_m} m cable</Tag>{s.usable_area_sqft && <Tag>{s.usable_area_sqft} sq ft</Tag>}</div>
