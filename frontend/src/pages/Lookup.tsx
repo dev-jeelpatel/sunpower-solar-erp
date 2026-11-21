@@ -36,7 +36,7 @@ export default function Lookup() {
           <p>Type a serial number, a customer name or a phone number. We show who owns it and whether it is still under warranty.</p>
           <div className="lk-search">
             <Icon n="search" />
-            <input className="mono" autoFocus placeholder="e.g. SP-INV3K-004093 or 98250 99887" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className="mono" autoFocus placeholder="e.g. INV3-001 or 9825010001" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
         </div>
         {err && <div className="alert bad">{err}</div>}

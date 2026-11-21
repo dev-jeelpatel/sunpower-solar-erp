@@ -143,7 +143,7 @@ Password for every account: `Sunpower@123`
 
 The login screen has one-click role buttons that fill the form.
 
-Sample serial numbers for the warranty lookup: `HX-INV3K-12220` (in warranty), `SP-INV1K-004081` (in stock, warranty not started).
+Serial numbers are short and sequential: `PNL-001`, `INV1-001` to `INV5-001` (inverters by kW), `BAT-001`, `MC40-001` and `MC60-001` (charge controllers). Try `INV3-001` (in warranty) or `INV3-011` (in stock, warranty not started). Customer mobile numbers run `9825010001`, `9825010002`, ... Reset the demo data any time with `npm run db:reseed` in `backend`.
 
 ---
 

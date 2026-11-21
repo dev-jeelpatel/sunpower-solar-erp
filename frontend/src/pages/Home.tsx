@@ -405,7 +405,7 @@ function WarrantyBySerial() {
   return (
     <>
       <form onSubmit={check} className="lookup">
-        <input placeholder="e.g. SP-INV3K-004093" value={serial} onChange={(e) => setSerial(e.target.value)} aria-label="Serial number" />
+        <input placeholder="e.g. INV3-001" value={serial} onChange={(e) => setSerial(e.target.value)} aria-label="Serial number" />
         <button className="s-btn primary" disabled={busy || serial.trim().length < 6}>{busy ? 'Checking…' : 'Check'}</button>
       </form>
       {err && <div className="alert bad" style={{ marginTop: 12 }}>{err}</div>}
