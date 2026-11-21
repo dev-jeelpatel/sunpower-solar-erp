@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon, type IconName } from './icons';
-import { fmtDate } from './ui';
+import { fmtDate, fmtDateTime } from './ui';
 
 export type KitTone = 'indigo' | 'blue' | 'green' | 'amber' | 'rose' | 'violet';
 
@@ -106,4 +106,34 @@ export function dueIn(d?: string | null): { text: string; tone: 'rose' | 'amber'
   if (days === 0) return { text: 'Today', tone: 'amber', days };
   if (days > 0) return { text: `In ${days} day${days === 1 ? '' : 's'}`, tone: days <= 3 ? 'amber' : 'slate', days };
   return { text: `${-days} day${days === -1 ? '' : 's'} ago`, tone: 'rose', days };
+}
+
+// ---------- order-tracking style progress ----------
+export interface TrackStep { key: string; label: string; at?: string | null }
+
+/**
+ * Horizontal tracker (vertical on phones): done steps get a tick, the current step pulses,
+ * future steps stay grey. `next` is a one-line "what happens now" hint under the line.
+ */
+export function Tracker({ steps, current, finished = false, next }: { steps: TrackStep[]; current: number; finished?: boolean; next?: ReactNode }) {
+  const cur = Math.max(0, current);
+  return (
+    <section className="track card">
+      <div className="track-top">
+        <span className="track-step"><b>{finished ? steps.length : cur + 1}</b> / {steps.length}<em>{finished ? 'Complete' : 'Current stage'}</em></span>
+        {next && <span className="track-next"><Icon n="zap" /><span>{next}</span></span>}
+      </div>
+      <ol style={{ '--n': steps.length } as any}>
+        {steps.map((s, i) => {
+          const state = finished || i < cur ? 'done' : i === cur ? 'now' : 'todo';
+          return (
+            <li key={s.key} className={state} aria-current={state === 'now' ? 'step' : undefined}>
+              <span className="dot">{state === 'done' ? <Icon n="check" /> : i + 1}</span>
+              <span className="track-tx"><b>{s.label}</b><small>{s.at ? fmtDateTime(s.at) : state === 'now' ? 'In progress' : state === 'todo' ? 'Upcoming' : 'Done'}</small></span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
 }

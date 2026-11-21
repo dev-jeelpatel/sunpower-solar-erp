@@ -802,3 +802,55 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .kpi-card:hover { border-color: color-mix(in srgb, var(--t) 28%, #fff); box-shadow: 0 12px 28px rgba(15, 23, 42, .08); }
 .kpi-label { font-size: .78rem; letter-spacing: .01em; }
 .kpi-value { font-size: 1.7rem; margin: 2px 0 3px; }
+
+/* ---------- tracker (order-tracking style) ---------- */
+.track { padding: 22px 24px 18px; margin-bottom: 18px; }
+.track ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+.track li { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 0 4px; }
+.track li::before { content: ''; position: absolute; top: 17px; left: -50%; right: 50%; height: 4px; border-radius: 4px; background: #e3e8f2; z-index: 0; }
+.track li:first-child::before { display: none; }
+.track li.done::before, .track li.now::before { background: linear-gradient(90deg, #34d399, #059669); }
+.track .dot { position: relative; z-index: 1; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: .82rem; font-weight: 700; background: #fff; color: #94a3b8; border: 2px solid #dfe5f0; transition: background .3s, border-color .3s, color .3s; }
+.track .dot svg { width: 18px; height: 18px; stroke-width: 3; }
+.track li.done .dot { background: linear-gradient(145deg, #34d399, #059669); border-color: transparent; color: #fff; box-shadow: 0 6px 14px rgba(5, 150, 105, .3); }
+.track li.now .dot { background: linear-gradient(145deg, #818cf8, #4f46e5); border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(79, 70, 229, .4); animation: track-pulse 2s ease-out infinite; }
+@keyframes track-pulse { 0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, .5); } 70% { box-shadow: 0 0 0 11px rgba(99, 102, 241, 0); } 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); } }
+.track-tx { line-height: 1.3; } .track-tx b { display: block; font-size: .84rem; font-weight: 650; color: var(--text); } .track-tx small { display: block; font-size: .72rem; color: var(--muted); margin-top: 1px; }
+.track li.todo .track-tx b { color: #94a3b8; } .track li.now .track-tx b { color: var(--primary-dark); } .track li.now .track-tx small { color: var(--primary); font-weight: 600; }
+.track-next { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 11px 14px; border-radius: 12px; background: var(--primary-soft); color: #3730a3; font-size: .86rem; } .track-next svg { width: 17px; height: 17px; flex: none; color: var(--primary); }
+@media (max-width: 760px) {
+  .track ol { grid-template-columns: 1fr; gap: 0; }
+  .track li { flex-direction: row; text-align: left; align-items: flex-start; gap: 14px; padding: 0 0 18px; }
+  .track li:last-child { padding-bottom: 0; }
+  .track li::before { top: -18px; bottom: auto; left: 17px; right: auto; width: 4px; height: 100%; } .track li:first-child::before { display: none; }
+  .track li:not(:first-child)::before { top: -100%; height: 100%; }
+  .track-tx { padding-top: 2px; }
+}
+@media (prefers-reduced-motion: reduce) { .track li.now .dot { animation: none; } }
+
+/* ---------- tracker: compact version ---------- */
+.track { padding: 12px 18px 14px; margin-bottom: 16px; border-radius: 14px; }
+.track-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-strong); }
+.track-step { display: inline-flex; align-items: baseline; gap: 4px; font-size: .8rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.track-step b { font-size: 1.05rem; color: var(--primary-dark); font-weight: 800; letter-spacing: -.02em; }
+.track-step em { font-style: normal; margin-left: 8px; padding: 2px 9px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-dark); font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; align-self: center; }
+.track-next { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; background: none; border-radius: 0; font-size: .8rem; color: #475569; min-width: 0; text-align: right; justify-content: flex-end; }
+.track-next svg { width: 15px; height: 15px; flex: none; color: var(--warn); }
+.track-next > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.track li { gap: 7px; }
+.track li::before { top: 12px; height: 3px; }
+.track .dot { width: 28px; height: 28px; font-size: .74rem; border-width: 2px; }
+.track .dot svg { width: 14px; height: 14px; }
+.track li.done .dot { box-shadow: 0 3px 8px rgba(5, 150, 105, .28); }
+.track li.now .dot { box-shadow: 0 4px 10px rgba(79, 70, 229, .38); }
+@keyframes track-pulse { 0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, .5); } 70% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); } 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); } }
+.track-tx b { font-size: .76rem; } .track-tx small { font-size: .66rem; margin-top: 0; }
+
+@media (max-width: 900px) { .track-next > span { white-space: normal; } .track-top { flex-direction: column; align-items: flex-start; gap: 6px; } .track-next { text-align: left; justify-content: flex-start; } }
+@media (max-width: 760px) {
+  .track li { gap: 12px; padding-bottom: 12px; }
+  .track li::before { left: 13px; width: 3px; top: -12px; }
+  .track li:not(:first-child)::before { top: -100%; height: 100%; }
+  .track-tx b { font-size: .82rem; } .track-tx small { font-size: .72rem; }
+}
