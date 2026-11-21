@@ -34,6 +34,20 @@ Demo logins (password `Sunpower@123`): `admin@`, `sales@`, `tech1@`, `warehouse@
 
 `npm run e2e` in `backend` walks the whole business flow against a running API (73 checks).
 
+## Customer website and staff login
+
+| URL | Who | What |
+|---|---|---|
+| `/home` (also `/` when signed out) | Customers | Marketing site: how it works, live package prices, savings calculator, subsidy info, warranty check by serial number, FAQ and a free-quote form |
+| `/enquire` | Customers | Stand-alone enquiry page (shareable link) |
+| `/login` | Staff | Sign-in screen with one-click demo roles |
+| `/` (signed in) | Staff | ERP dashboard |
+
+- The **savings calculator** takes the customer's monthly bill and chosen system size (1-5 kW). It assumes about Rs 7 per unit and 120 units a month per kW, and shows the bill after solar, yearly saving, subsidy and payback. These are estimates; the roof survey gives the exact figure.
+- **Package prices** come from the database through `GET /api/public/packages` (cost prices are never exposed).
+- **Warranty check** uses `GET /api/public/warranty/:serial` and returns only the product and warranty dates, with no customer details. It is rate-limited.
+- The **free-quote form** creates a real enquiry for the sales team, auto-assigned to the least-loaded salesperson.
+
 ## Business flow
 
 ```
