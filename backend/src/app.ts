@@ -25,6 +25,7 @@ import { subsidiesRouter } from './modules/subsidies/subsidies.routes';
 import { ticketsRouter } from './modules/tickets/tickets.routes';
 import { websiteRouter } from './modules/public/public.routes';
 import { usersRouter } from './modules/users/users.routes';
+import { availabilityRouter } from './modules/availability/availability.routes';
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
 
@@ -56,6 +57,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/public', publicRouter);
 app.use('/api/public', websiteRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/availability', availabilityRouter);
 app.use('/api/enquiries', enquiriesRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api', customersRouter);

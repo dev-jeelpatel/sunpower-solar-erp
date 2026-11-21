@@ -1,6 +1,7 @@
 import { forbidden, notFound, unprocessable } from '../../lib/errors';
 import type { AuthUser } from '../../lib/http';
 import { logActivity, tx } from '../../lib/prisma';
+import { availabilityService } from '../availability/availability.service';
 import { surveysRepository as repo } from './surveys.repository';
 import type { CompleteSurveyInput, ReviewSurveyInput, ScheduleSurveyInput } from './surveys.schema';
 
@@ -17,6 +18,7 @@ export const surveysService = {
         throw unprocessable('Only enquiries that passed the phone check can be sent for a survey. Qualify the enquiry first.');
       if (!(await repo.isActiveTechnician(db, d.technicianId)))
         throw unprocessable('Choose an active technician', { technicianId: 'Not a technician' });
+      await availabilityService.assertFree(db, d.technicianId, d.scheduledDate);
       const survey = await repo.insert(db, d.enquiryId, d.technicianId, d.scheduledDate);
       await repo.setEnquiryStatus(db, d.enquiryId, 'survey_scheduled');
       await logActivity(db, 'enquiry', d.enquiryId, 'survey_scheduled', userId, { technicianId: d.technicianId, scheduledDate: d.scheduledDate });
