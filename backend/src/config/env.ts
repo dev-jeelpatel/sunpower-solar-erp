@@ -14,6 +14,9 @@ export const env = {
   advancePercent: Number(process.env.ADVANCE_PERCENT) || 30, // % of order total that confirms an order
   gstPercent: Number(process.env.GST_PERCENT) || 5,
   quoteValidDays: 15,
+  // Mobile-number warranty check. In demo mode the one-time code is returned to the browser instead of being
+  // texted, so the flow can be shown without an SMS provider. It is OFF by default in production.
+  otpDemo: process.env.OTP_DEMO ? process.env.OTP_DEMO === 'true' : !isProd,
   isProd,
 };
 

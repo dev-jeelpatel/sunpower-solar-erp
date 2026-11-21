@@ -26,4 +26,19 @@ export const publicRepository = {
          FROM inventory_units u JOIN products p ON p.id = u.product_id WHERE u.serial_no = $1`,
       [serial],
     ),
+
+  customerByPhone: (phone: string) => q1<{ id: number; name: string }>(prisma, 'SELECT id, name FROM customers WHERE phone = $1', [phone]),
+
+  /** Everything a customer owns, with warranty status. No prices, no other customers' data. */
+  unitsOfCustomer: (customerId: number) =>
+    q(
+      prisma,
+      `SELECT p.name AS product_name, p.category, u.serial_no, u.warranty_start, u.warranty_end, p.warranty_months,
+              CASE WHEN u.warranty_end IS NULL THEN 'not_started'
+                   WHEN u.warranty_end >= current_date THEN 'in_warranty' ELSE 'expired' END AS warranty_state,
+              GREATEST(u.warranty_end - current_date, 0) AS days_left
+         FROM inventory_units u JOIN products p ON p.id = u.product_id
+        WHERE u.customer_id = $1 ORDER BY (u.warranty_end IS NULL), p.category, u.serial_no`,
+      [customerId],
+    ),
 };
