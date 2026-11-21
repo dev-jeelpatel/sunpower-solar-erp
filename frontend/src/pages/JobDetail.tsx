@@ -90,7 +90,7 @@ export default function JobDetail() {
   return (
     <Async state={state}>{(j) => (
       <>
-        <PageHead crumb={<div className="crumb"><Link to="/jobs">← Jobs</Link></div>} title={j.customer_name} sub={<>{j.order_no} · {j.package_name} · <Badge status={j.status} /></>} />
+        <PageHead crumb={<div className="crumb"><Link to="/jobs">← Jobs</Link></div>} title={j.customer_name} sub={<><Link to={`/orders/${j.order_id}`}>{j.order_no}</Link> · <Link to={`/customers?id=${j.customer_id}`}>Customer</Link> · {j.package_name} · <Badge status={j.status} /></>} />
         <div className="grid split">
           <div className="stack">
             {j.status === 'completed' ? (

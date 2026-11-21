@@ -28,7 +28,7 @@ export default function QuoteDetail() {
           </div>} />
         <Card>
           <div className="grid g2" style={{ marginBottom: 18 }}>
-            <div><div className="muted small">Prepared for</div><b>{q.customer_name}</b><div>{q.address}{q.city ? `, ${q.city}` : ''}</div><div className="muted">{q.phone}</div></div>
+            <div><div className="muted small">Prepared for</div><b>{q.customer_id ? <Link to={`/customers?id=${q.customer_id}`}>{q.customer_name}</Link> : q.customer_name}</b> · <Link to={`/enquiries/${q.enquiry_id}`}>Enquiry</Link><div>{q.address}{q.city ? `, ${q.city}` : ''}</div><div className="muted">{q.phone}</div></div>
             <div style={{ textAlign: 'right' }}><div className="muted small">{q.package_name}</div><div>Issued {fmtDate(q.created_at)}</div><div>Valid until <b>{fmtDate(q.valid_until)}</b></div><div className="muted small">Prepared by {q.created_by_name}</div></div>
           </div>
           <div className="table-wrap"><table>

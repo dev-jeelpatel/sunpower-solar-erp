@@ -81,7 +81,7 @@ export function InvoiceDetail() {
               {can(user, 'sales') && bal > 0 && i.status !== 'void' && <button className="btn" onClick={() => setPaying(true)}>Record payment</button>}</div>} />
           <Card>
             <div className="grid g2" style={{ marginBottom: 18 }}>
-              <div><div className="muted small">Billed to</div><b>{i.customer_name}</b><div>{i.address}{i.city ? `, ${i.city}` : ''}</div><div className="muted">{i.phone}</div></div>
+              <div><div className="muted small">Billed to</div><b><Link to={`/customers?id=${i.customer_id}`}>{i.customer_name}</Link></b><div>{i.address}{i.city ? `, ${i.city}` : ''}</div><div className="muted">{i.phone}</div></div>
               <div style={{ textAlign: 'right' }}><div>Issued {fmtDate(i.issued_at)}</div><div>Due {fmtDate(i.due_date)}</div>
                 <div className="muted small">{i.order_no ? <Link to={`/orders/${i.order_id}`}>{i.order_no}</Link> : i.ticket_no ? <Link to={`/tickets/${i.ticket_id}`}>{i.ticket_no}</Link> : ''}</div></div>
             </div>

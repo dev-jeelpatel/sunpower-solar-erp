@@ -18,7 +18,7 @@ export const dispatchRepository = {
   header: (db: Db, id: number) =>
     q1<Row & { order_id: number }>(
       db,
-      `SELECT d.*, o.order_no, o.id AS order_id, c.name AS customer_name, c.address, c.city, c.phone
+      `SELECT d.*, o.order_no, o.id AS order_id, c.id AS customer_id, c.name AS customer_name, c.address, c.city, c.phone
          FROM dispatches d JOIN orders o ON o.id = d.order_id JOIN customers c ON c.id = o.customer_id WHERE d.id = $1`,
       [id],
     ),

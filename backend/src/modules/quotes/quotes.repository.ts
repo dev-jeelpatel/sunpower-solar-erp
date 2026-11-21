@@ -22,7 +22,7 @@ export const quotesRepository = {
   findDetailed: (id: number) =>
     q1(
       prisma,
-      `SELECT q.*, e.customer_name, e.phone, e.email, e.address, e.city, e.subsidy_required, e.requested_kw,
+      `SELECT q.*, e.customer_id, e.customer_name, e.phone, e.email, e.address, e.city, e.subsidy_required, e.requested_kw,
               pk.name AS package_name, pk.capacity_kw, u.name AS created_by_name, (q.valid_until < current_date) AS expired
          FROM quotes q JOIN enquiries e ON e.id = q.enquiry_id JOIN packages pk ON pk.id = q.package_id
          LEFT JOIN users u ON u.id = q.created_by WHERE q.id = $1`,

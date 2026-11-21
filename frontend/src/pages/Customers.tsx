@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, fmtDate, money, useAction, useAsync, useDebounced, useForm } from '../components/ui';
@@ -52,7 +52,9 @@ function Detail({ id, onClose, onEdit, onDelete }) {
 
 export default function Customers() {
   const [q, setQ] = useState('');
-  const [open, setOpen] = useState<any>(null);
+  const [params, setParams] = useSearchParams();
+  const [open, setOpen] = useState<any>(params.get('id') ? Number(params.get('id')) : null); // other pages link here with ?id=
+  const closeDetail = () => { setOpen(null); if (params.get('id')) setParams({}, { replace: true }); };
   const [form, setForm] = useState<any>(null);
   const [ask, setAsk] = useState<any>(null);
   const user = useCurrentUser();
@@ -95,7 +97,7 @@ export default function Customers() {
           </div>
         );
       }}</Async>
-      {open && <Detail id={open} onClose={() => setOpen(null)} onEdit={(c) => { setOpen(null); setForm(c); }} onDelete={(c) => { setOpen(null); setAsk(c); }} />}
+      {open && <Detail id={open} onClose={closeDetail} onEdit={(c) => { closeDetail(); setForm(c); }} onDelete={(c) => { closeDetail(); setAsk(c); }} />}
       {form && <CustomerForm c={form.id ? form : null} onClose={() => setForm(null)} onDone={() => { setForm(null); state.reload(); }} />}
       {ask && <Confirm danger yesLabel="Delete" title="Delete customer?" onNo={() => setAsk(null)}
         onYes={async () => { const c = ask; setAsk(null); if (await run(() => del(`/customers/${c.id}`), 'Customer deleted')) state.reload(); }}

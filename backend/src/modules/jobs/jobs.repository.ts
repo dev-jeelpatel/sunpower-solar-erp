@@ -25,7 +25,7 @@ export const jobsRepository = {
   orderContext: (orderId: number) =>
     q1(
       prisma,
-      `SELECT o.id AS order_id, o.order_no, c.name AS customer_name, c.phone, c.address, c.city, pk.name AS package_name, pk.capacity_kw, d.status AS dispatch_status
+      `SELECT o.id AS order_id, o.order_no, c.id AS customer_id, c.name AS customer_name, c.phone, c.address, c.city, pk.name AS package_name, pk.capacity_kw, d.status AS dispatch_status
          FROM orders o JOIN customers c ON c.id = o.customer_id JOIN quotes q ON q.id = o.quote_id JOIN packages pk ON pk.id = q.package_id
          LEFT JOIN dispatches d ON d.order_id = o.id WHERE o.id = $1`,
       [orderId],

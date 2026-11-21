@@ -80,7 +80,7 @@ export default function TicketDetail() {
           <div className="grid split">
             <div className="stack">
               <Card title="Complaint"><dl className="kv">
-                <dt>Customer</dt><dd><b>{t.customer_name}</b> · <a href={`tel:${t.phone}`}>{t.phone}</a><div className="muted small">{t.address}</div></dd>
+                <dt>Customer</dt><dd><Link to={`/customers?id=${t.customer_id}`}><b>{t.customer_name}</b></Link> · <a href={`tel:${t.phone}`}>{t.phone}</a><div className="muted small">{t.address}</div></dd>
                 <dt>Unit</dt><dd>{t.product_name ? <>{t.product_name} · <Link className="mono" to={`/lookup?serial=${t.serial_no}`}>{t.serial_no}</Link></> : '-'}</dd>
                 <dt>Warranty</dt><dd>{t.warranty_end ? `${fmtDate(t.warranty_start)} → ${fmtDate(t.warranty_end)}` : 'Unknown'} <Badge status={t.warranty_status} /></dd>
                 <dt>Fault code</dt><dd className="mono">{t.fault_code || '-'}</dd><dt>Details</dt><dd>{t.description || '-'}</dd><dt>Opened</dt><dd>{fmtDateTime(t.created_at)}</dd></dl></Card>

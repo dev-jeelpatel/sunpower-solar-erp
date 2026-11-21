@@ -53,7 +53,7 @@ export default function DispatchDetail() {
 
   return (
     <>
-      <PageHead crumb={<div className="crumb"><Link to="/dispatch">← Dispatch</Link></div>} title={`Dispatch · ${d.order_no}`} sub={<>{d.customer_name} · {d.address}{d.city ? `, ${d.city}` : ''} · <Badge status={d.status} /></>}
+      <PageHead crumb={<div className="crumb"><Link to="/dispatch">← Dispatch</Link></div>} title={`Dispatch · ${d.order_no}`} sub={<><Link to={`/customers?id=${d.customer_id}`}>{d.customer_name}</Link> · <Link to={`/orders/${d.order_id}`}>{d.order_no}</Link> · {d.address}{d.city ? `, ${d.city}` : ''} · <Badge status={d.status} /></>}
         actions={wh && d.status === 'dispatched' && <button className="btn ok" disabled={busy} onClick={async () => { if (await run(() => post(`/dispatches/${id}/deliver`), 'Delivery confirmed: warranty started')) load(); }}>✓ Mark delivered</button>} />
 
       {d.status === 'delivered' && <div className="alert ok" style={{ marginBottom: 16 }}>Delivered {fmtDateTime(d.delivered_at)}. The warranty clock started automatically for every serial number below.</div>}

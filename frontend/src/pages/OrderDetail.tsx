@@ -112,7 +112,8 @@ export default function OrderDetail() {
             </div>
             <div className="stack">
               <Card title="Summary"><dl className="kv" style={{ gridTemplateColumns: '110px 1fr' }}>
-                <dt>Customer</dt><dd><Link to={`/customers`}>{o.customer_name}</Link><div className="muted small">{o.phone}</div></dd>
+                <dt>Customer</dt><dd><Link to={`/customers?id=${o.customer_id}`}>{o.customer_name}</Link><div className="muted small">{o.phone}</div></dd>
+                <dt>Enquiry</dt><dd><Link to={`/enquiries/${o.enquiry_id}`}>Open the original enquiry</Link></dd>
                 <dt>Site</dt><dd>{o.address}{o.city ? `, ${o.city}` : ''}</dd>
                 <dt>Total</dt><dd><b>{money(o.total, true)}</b></dd><dt>Paid</dt><dd>{money(paid, true)}</dd><dt>Balance</dt><dd><b style={{ color: remaining > 0 ? 'var(--bad)' : 'var(--ok)' }}>{money(remaining, true)}</b></dd>
                 <dt>Quote</dt><dd><Link to={`/quotes/${o.quote_id}`}>{o.quote_no}</Link></dd></dl></Card>

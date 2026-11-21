@@ -48,6 +48,19 @@ async function login(name) {
   for (const n of ['sales', 'tech1', 'warehouse', 'support', 'director', 'admin']) await login(n);
   await fails('technician cannot create quotes', call('POST', '/quotes', { token: tokens.tech1, body: { enquiryId: 1, packageId: 1 } }), 403);
 
+  console.log('Stock: supplier -> purchase order -> goods receipt');
+  const st = String(Date.now()).slice(-5);
+  const sup = await ok('create supplier', call('POST', '/inventory/suppliers', { token: tokens.warehouse, body: { name: `Test Supplier ${st.replace(/\d/g, (d) => 'ABCDEFGHIJ'[d])}` } }), 201);
+  const allProducts = await ok('products list', call('GET', '/catalog/products', { token: tokens.warehouse }));
+  const stockable = allProducts.filter((p) => p.category !== 'service');
+  const po = await ok('create purchase order', call('POST', '/inventory/purchases', { token: tokens.warehouse, body: { supplierId: sup.id, items: stockable.map((p) => ({ productId: p.product_id, quantity: 40, unitCost: Number(p.cost_price) || 1 })) } }), 201);
+  const poFull = await ok('purchase order detail', call('GET', `/inventory/purchases/${po.id}`, { token: tokens.warehouse }));
+  const lines = poFull.items.map((i) => ({ itemId: i.id, serials: i.tracked_serial ? Array.from({ length: i.quantity }, (_, n) => `T${st}${i.sku.replace(/[^A-Z0-9]/g, '')}-${String(n + 1).padStart(3, '0')}`) : [] }));
+  await ok('receive goods with serials', call('POST', `/inventory/purchases/${po.id}/receive`, { token: tokens.warehouse, body: { lines } }));
+  await fails('received PO cannot be cancelled', call('POST', `/inventory/purchases/${po.id}/cancel`, { token: tokens.warehouse }), 422);
+  const stockNow = await ok('stock levels', call('GET', '/inventory/stock', { token: tokens.warehouse }));
+  assert.ok(stockNow.every((p) => p.category === 'service' || p.on_hand >= 40), 'every product received 40');
+
   console.log('Enquiry -> survey -> quote');
   const stamp = String(Date.now()).slice(-6);
   const enq = await ok('public enquiry accepted', call('POST', '/public/enquiries', { body: { name: 'Eetoo Customer', phone: `98${stamp}12`.slice(0, 10).padEnd(10, '1'), email: `e2e${stamp}@example.com`, address: '21 Sunrise Society, Ahmedabad', city: 'Ahmedabad', requestedKw: 3, systemType: 'on_grid', subsidyRequired: true } }), 201);
@@ -88,9 +101,10 @@ async function login(name) {
 
   const disp = await ok('warehouse sees pick list', call('GET', `/dispatches/${o.dispatch.id}`, { token: tokens.warehouse }));
   await fails('cannot dispatch before scanning', call('POST', `/dispatches/${disp.id}/dispatch`, { token: tokens.warehouse, body: { vehicleNo: 'GJ05AB1234' } }), 422, 'Scan every serial');
-  const units = await ok('serial units in stock', call('GET', '/inventory/units?status=in_stock&limit=100', { token: tokens.warehouse }));
+  await ok('serial units in stock', call('GET', '/inventory/units?status=in_stock&limit=5', { token: tokens.warehouse }));
   const scanned = [];
   for (const line of disp.items.filter((l) => l.tracked_serial)) {
+    const units = await ok(`units of ${line.sku}`, call('GET', `/inventory/units?status=in_stock&limit=100&productId=${line.product_id}`, { token: tokens.warehouse }));
     const pool = units.items.filter((u) => u.product_id === line.product_id && !scanned.includes(u.serial_no)).slice(0, line.required);
     assert.equal(pool.length, line.required, `enough stock for ${line.sku}`);
     for (const u of pool) { await ok(`scan ${u.serial_no}`, call('POST', `/dispatches/${disp.id}/scan`, { token: tokens.warehouse, body: { serial: u.serial_no } })); scanned.push(u.serial_no); }
@@ -99,11 +113,11 @@ async function login(name) {
   await fails('invalid vehicle number rejected', call('POST', `/dispatches/${disp.id}/dispatch`, { token: tokens.warehouse, body: { vehicleNo: '??' } }), 400);
   await ok('truck dispatched', call('POST', `/dispatches/${disp.id}/dispatch`, { token: tokens.warehouse, body: { vehicleNo: 'GJ05AB1234' } }));
   await ok('delivery confirmed', call('POST', `/dispatches/${disp.id}/deliver`, { token: tokens.warehouse }));
-  const invSerial = scanned.find((s) => s.startsWith('INV'));
+  const invSerial = scanned.find((s) => s.includes('INV'));
   const lookup = await ok('warranty lookup by serial', call('GET', `/inventory/units/lookup/${invSerial}`, { token: tokens.support }));
   assert.equal(lookup.warranty_state, 'in_warranty');
   assert.ok(lookup.warranty_end, 'warranty clock started automatically');
-  const panelSerial = scanned.find((s) => s.startsWith('PNL'));
+  const panelSerial = scanned.find((s) => s.includes('PNL'));
   const pl = await ok('panel lookup', call('GET', `/inventory/units/lookup/${panelSerial}`, { token: tokens.support }));
   assert.ok(new Date(pl.warranty_end).getFullYear() - new Date().getFullYear() >= 19, 'panel warranty ~20 years');
 
@@ -134,7 +148,7 @@ async function login(name) {
   assert.equal(t1r.invoice, null, 'no invoice for in-warranty repair');
   await ok('customer confirms -> closed', call('POST', `/tickets/${t1.id}/confirm`, { token: tokens.support }));
   // the demo data is only a few months old, so age one delivered unit by hand to get an expired warranty
-  const agedSerial = scanned.find((s) => s.startsWith('MC'));
+  const agedSerial = scanned.find((s) => s.includes('MPPT'));
   {
     require('dotenv').config({ path: require('node:path').join(__dirname, '..', '.env') });
     const { Pool } = require('pg');
