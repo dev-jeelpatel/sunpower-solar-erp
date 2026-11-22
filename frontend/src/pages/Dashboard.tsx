@@ -30,21 +30,6 @@ function Kpi({ icon, tone, label: l, value, sub }: { icon: IconName; tone: Tone;
   );
 }
 
-const QUICK: { to: string; text: string; icon: IconName; roles: string[] }[] = [
-  { to: '/enquiries', text: 'Enquiries', icon: 'inbox', roles: ['sales'] },
-  { to: '/quotes', text: 'Quotes', icon: 'doc', roles: ['sales'] },
-  { to: '/orders', text: 'Orders', icon: 'box', roles: ['sales', 'warehouse'] },
-  { to: '/dispatch', text: 'Dispatch', icon: 'truck', roles: ['warehouse'] },
-  { to: '/inventory', text: 'Inventory', icon: 'warehouse', roles: ['warehouse'] },
-  { to: '/jobs', text: 'My jobs', icon: 'wrench', roles: ['technician'] },
-  { to: '/surveys', text: 'Surveys', icon: 'ruler', roles: ['technician'] },
-  { to: '/tickets', text: 'Tickets', icon: 'ticket', roles: ['support', 'technician'] },
-  { to: '/lookup', text: 'Warranty lookup', icon: 'search', roles: ['support'] },
-  { to: '/reports', text: 'Profit & reports', icon: 'chart', roles: ['director'] },
-  { to: '/invoices', text: 'Invoices', icon: 'card', roles: ['sales', 'director'] },
-  { to: '/customers', text: 'Customers', icon: 'users', roles: ['director', 'support'] },
-];
-
 const PIPE_STAGES: [string, string][] = [
   ['new', 'New'], ['contacted', 'Contacted'], ['qualified', 'Qualified'], ['survey_scheduled', 'Survey booked'],
   ['survey_approved', 'Survey approved'], ['quoted', 'Quote sent'], ['won', 'Won'], ['lost', 'Lost'],
@@ -153,7 +138,6 @@ export default function Dashboard() {
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const date = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const quick = QUICK.filter((q) => user.role === 'admin' || q.roles.includes(user.role)).slice(0, 6);
 
   return (
     <>
@@ -181,13 +165,6 @@ export default function Dashboard() {
                 ? <Kpi icon="trend" tone={d.kpi.profit < 0 ? 'rose' : 'violet'} label="Profit on completed jobs" value={money(d.kpi.profit)} sub={`on ${money(d.kpi.revenue_completed)} revenue`} />
                 : <Kpi icon="ticket" tone={d.tickets.urgent ? 'rose' : 'amber'} label="Open service tickets" value={d.tickets.open} sub={`${d.tickets.urgent} high priority`} />}
             </div>
-
-            {quick.length > 0 && (
-              <div className="quick">
-                <span><Icon n="zap" />Quick actions</span>
-                {quick.map((q) => <Link key={q.to} to={q.to}><Icon n={q.icon} />{q.text}</Link>)}
-              </div>
-            )}
 
             <div className="grid split">
               <section className="card dcard">

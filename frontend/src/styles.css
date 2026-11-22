@@ -1150,3 +1150,5 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .stock-box { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border-radius: 12px; background: #f4f6fd; border: 1px solid #e4e8f7; }
 .stock-box > div { display: grid; gap: 2px; } .stock-box span { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
 .stock-box b { font-size: 1.5rem; letter-spacing: -.02em; line-height: 1.1; } .stock-box small { color: var(--muted); font-size: .78rem; max-width: 340px; }
+.btn.call { background: #ecfdf5; border-color: #a7f3d0; color: #047857; box-shadow: none; } .btn.call:hover { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+.btn.call svg { stroke-width: 2.2; }

@@ -246,12 +246,12 @@ export default function EnquiryDetail() {
         <>
           <PageHead crumb={<div className="crumb"><Link to="/enquiries">← Enquiries</Link></div>} title={e.customer_name} sub={<span className="contact-line"><a href={`tel:${e.phone}`}><Icon n="phone" />{e.phone}</a>{e.email && <a href={`mailto:${e.email}`}><Icon n="mail" />{e.email}</a>}<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${e.address}${e.city ? `, ${e.city}` : ''}`)}`} target="_blank" rel="noreferrer" className="addr-chip" title="Open in Maps"><Icon n="pin" />{e.address}{e.city ? `, ${e.city}` : ''}</a></span>}
             actions={sales && <>
-              {['new', 'contacted', 'qualified'].includes(e.status) && <button className="btn secondary" onClick={() => setModal('qualify')}>📞 Log call</button>}
+              {['new', 'contacted', 'qualified'].includes(e.status) && <button className="btn call" onClick={() => setModal('qualify')}><Icon n="phone" />Log call</button>}
               {e.status === 'qualified' && <button className="btn" onClick={() => setModal('survey')}>Schedule survey</button>}
               {toReview && <button className="btn" onClick={() => setModal('review')}>Review survey</button>}
               {['survey_approved', 'quoted'].includes(e.status) && <button className="btn" onClick={() => setModal('quote')}>Create quote</button>}
-              {e.status !== 'won' && <button className="btn secondary" onClick={() => setModal('edit')}>Edit</button>}
-              {e.status !== 'won' && !e.customer_id && e.quotes.length === 0 && <button className="btn secondary danger-text" onClick={() => setModal('delete')}>Delete</button>}
+              {e.status !== 'won' && <button className="btn secondary" onClick={() => setModal('edit')}><Icon n="pencil" />Edit</button>}
+              {e.status !== 'won' && !e.customer_id && e.quotes.length === 0 && <button className="btn secondary danger-text" onClick={() => setModal('delete')}><Icon n="trash" />Delete</button>}
             </>} />
           {e.status === 'lost' ? <div className="alert bad" style={{ marginBottom: 16 }}>This enquiry was closed as not suitable.</div>
             : <Tracker
