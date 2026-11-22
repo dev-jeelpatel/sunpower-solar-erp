@@ -12,6 +12,7 @@ export const subsidiesService = {
     const cur = await repo.find(id);
     if (!cur) throw notFound('Subsidy application');
     if (['disbursed', 'rejected'].includes(cur.status)) throw unprocessable('This application is closed');
+    if (d.status === 'rejected' && !d.notes) throw unprocessable('Say why the application was rejected', { notes: 'Required when rejecting' });
     if (d.status !== 'rejected' && ORDER.indexOf(d.status) < ORDER.indexOf(cur.status)) throw unprocessable('Status cannot move backwards');
     if (['submitted', 'approved', 'disbursed'].includes(d.status) && !(d.referenceNo || cur.reference_no))
       throw unprocessable('Enter the portal reference number', { referenceNo: 'Required once submitted' });
