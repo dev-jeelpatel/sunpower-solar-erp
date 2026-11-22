@@ -32,16 +32,15 @@ service tickets and profit reports. It also includes a customer-facing website.
 6. [Project structure](#project-structure)
 7. [Business flow and rules](#business-flow-and-rules)
 8. [Roles and permissions](#roles-and-permissions)
-9. [Database design](#database-design)
-10. [API reference](#api-reference)
-11. [Frontend](#frontend)
-12. [Security](#security)
-13. [Real-time notifications](#real-time-notifications)
-14. [Configuration](#configuration)
-15. [Scripts](#scripts)
-16. [Testing](#testing)
-17. [Troubleshooting](#troubleshooting)
-18. [Known limitations and next steps](#known-limitations-and-next-steps)
+9. [API reference](#api-reference)
+10. [Frontend](#frontend)
+11. [Security](#security)
+12. [Real-time notifications](#real-time-notifications)
+13. [Configuration](#configuration)
+14. [Scripts](#scripts)
+15. [Testing](#testing)
+16. [Troubleshooting](#troubleshooting)
+17. [Known limitations and next steps](#known-limitations-and-next-steps)
 
 ---
 
@@ -318,68 +317,6 @@ Every list has the actions it needs, and each delete follows a safety rule so hi
 | Staff management, packages, **assign an enquiry to a salesperson** | admin only | | | | |
 
 Technicians only see surveys and jobs assigned to them. Every write route is checked on the server.
-
----
-
-## Database design
-
-28 tables, 22 enums, 4 views and 8 triggers. Schema: [`backend/prisma/schema.prisma`](backend/prisma/schema.prisma).
-Migrations (including triggers and views): `backend/prisma/migrations/`.
-
-```mermaid
-erDiagram
-  USERS ||--o{ ENQUIRIES : "assigned to"
-  ENQUIRIES ||--o{ SURVEYS : has
-  USERS ||--o{ SURVEYS : "technician"
-  ENQUIRIES ||--o{ QUOTES : has
-  PACKAGES ||--o{ QUOTES : "template for"
-  PACKAGES ||--o{ PACKAGE_ITEMS : "bill of materials"
-  PRODUCTS ||--o{ PACKAGE_ITEMS : in
-  QUOTES ||--o{ QUOTE_ITEMS : has
-  PRODUCTS ||--o{ QUOTE_ITEMS : priced
-  QUOTES ||--o| ORDERS : "accepted as"
-  CUSTOMERS ||--o{ ORDERS : places
-  ORDERS ||--o{ ORDER_ITEMS : has
-  ORDERS ||--o{ INVOICES : billed
-  INVOICES ||--o{ INVOICE_ITEMS : has
-  INVOICES ||--o{ PAYMENTS : "paid by"
-  ORDERS ||--o| DISPATCHES : shipped
-  DISPATCHES ||--o{ INVENTORY_UNITS : "carries serials"
-  PRODUCTS ||--o{ INVENTORY_UNITS : "serial tracked"
-  PRODUCTS ||--o{ STOCK_MOVEMENTS : ledger
-  SUPPLIERS ||--o{ PURCHASE_ORDERS : supplies
-  PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ITEMS : has
-  PURCHASE_ORDERS ||--o{ INVENTORY_UNITS : received
-  ORDERS ||--o| INSTALLATION_JOBS : installed
-  INSTALLATION_JOBS ||--o{ JOB_CREW : staffed
-  USERS ||--o{ JOB_CREW : works
-  INSTALLATION_JOBS ||--o{ JOB_PHOTOS : documents
-  ORDERS ||--o| SUBSIDY_APPLICATIONS : "may have"
-  CUSTOMERS ||--o{ TICKETS : raises
-  INVENTORY_UNITS ||--o{ TICKETS : "faulty unit"
-  TICKETS ||--o{ TICKET_LINES : "parts and labour"
-  TICKETS ||--o| INVOICES : "billed when out of warranty"
-  USERS ||--o{ TECHNICIAN_PAYOUTS : paid
-```
-
-**Triggers (rules enforced inside PostgreSQL, so even raw SQL cannot break them)**
-
-| Trigger | Rule |
-|---|---|
-| `quotes_need_survey` | A quote can only be inserted for an enquiry whose survey is approved |
-| `stock_non_negative` | A stock movement that would make stock negative is rejected |
-| `dispatch_starts_warranty` | Delivery sets the warranty start and end on every serial of the dispatch |
-| `units_status_guard` | A unit that has been delivered to a customer can never go back to stock |
-| `*_updated` | Keeps `updated_at` current on users, customers, enquiries and subsidy files |
-
-**Views (feed the dashboard and reports):** `v_stock` (on hand per product), `v_job_labour` (hours and labour cost),
-`v_job_profitability` (revenue, materials, labour, profit, margin), `v_order_pipeline` (next step for every order).
-
-**Design decisions**
-- Stock is a **ledger**: on-hand is the sum of `stock_movements`, so every purchase, dispatch and service part is auditable.
-- Each panel, inverter and battery is its own row (`inventory_units`) tied to a customer at dispatch, which makes warranty lookup instant.
-- Money and stock changes use transactions with row locks (`FOR UPDATE`), so two people cannot over-pay an invoice or scan the same serial twice.
-- An `activity_log` table records who did what, and is used for the timestamps on the progress trackers.
 
 ---
 
