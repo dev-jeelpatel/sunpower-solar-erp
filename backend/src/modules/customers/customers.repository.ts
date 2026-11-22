@@ -16,7 +16,13 @@ export const customersRepository = {
   findById: (id: number) => q1(prisma, 'SELECT * FROM customers WHERE id = $1', [id]),
 
   ordersOf: (id: number) =>
-    q(prisma, 'SELECT id, order_no, status, total, created_at FROM orders WHERE customer_id = $1 ORDER BY id DESC', [id]),
+    q(prisma, `SELECT o.id, o.order_no, o.status, o.total, o.created_at, qt.enquiry_id, pk.name AS package_name,
+                      (SELECT i.id FROM invoices i WHERE i.order_id = o.id LIMIT 1) AS invoice_id
+                 FROM orders o JOIN quotes qt ON qt.id = o.quote_id LEFT JOIN packages pk ON pk.id = qt.package_id
+                WHERE o.customer_id = $1 ORDER BY o.id DESC`, [id]),
+
+  enquiriesOf: (id: number) =>
+    q(prisma, 'SELECT id, status, requested_kw, system_type, created_at FROM enquiries WHERE customer_id = $1 ORDER BY id DESC', [id]),
 
   unitsOf: (id: number) =>
     q(

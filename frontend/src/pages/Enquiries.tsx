@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
@@ -10,8 +10,8 @@ import * as V from '../validators';
 
 const STATUSES = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won', 'lost'];
 
-function NewEnquiry({ onClose, onDone }) {
-  const f = useForm({ name: '', phone: '', email: '', address: '', city: '', requestedKw: '3', systemType: 'on_grid', source: 'call', subsidyRequired: false, message: '' });
+function NewEnquiry({ onClose, onDone, customer }: { onClose: () => void; onDone: () => void; customer?: any }) {
+  const f = useForm({ name: customer?.name || '', phone: customer?.phone || '', email: customer?.email || '', address: customer?.address || '', city: customer?.city || '', requestedKw: '3', systemType: 'on_grid', source: 'call', subsidyRequired: false, message: '' });
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const v = f.values;
@@ -23,6 +23,7 @@ function NewEnquiry({ onClose, onDone }) {
   };
   return (
     <Modal title="New enquiry" onClose={onClose} wide footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save enquiry</button></>}>
+      {customer && <div className="alert info" style={{ marginBottom: 12 }}>Repeat enquiry for <b>{customer.name}</b>. Their details are filled in. Just choose what they want now.</div>}
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
       <div className="form-grid">
         <Field label="Name" mask="name" rules={[V.required('Name'), V.personName('Name')]} required error={f.errors.name}><input {...f.bind('name')} /></Field>
@@ -108,12 +109,18 @@ function Board({ items, onOpen }: { items: any[]; onOpen: (id: number) => void }
 export default function Enquiries() {
   const user = useCurrentUser();
   const nav = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [status, setStatus] = useState(params.get('status') || ''); // the dashboard funnel links here with ?status=
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const [all, setAll] = useState(true); // salespeople see every enquiry by default; "Assigned to me" narrows it
   const [adding, setAdding] = useState(false);
+  const [repeatFor, setRepeatFor] = useState<any>(null);
+  const newFor = params.get('newFor'); // the customer window links here to start a repeat enquiry
+  useEffect(() => {
+    if (!newFor) return;
+    get(`/customers/${newFor}`).then((c) => { setRepeatFor(c); setAdding(true); }).catch(() => {}).finally(() => setParams({}, { replace: true }));
+  }, [newFor]); // eslint-disable-line
   const [view, setView] = useState<'list' | 'board'>('list');
   const dq = useDebounced(q);
   const board = view === 'board';
@@ -131,7 +138,7 @@ export default function Enquiries() {
       <PageHead
         title="Enquiries"
         sub="Every lead from the web form, WhatsApp and calls in one place"
-        actions={can(user, 'sales') && <button className="btn" onClick={() => setAdding(true)}><Icon n="plus" />New enquiry</button>}
+        actions={can(user, 'sales') && <button className="btn" onClick={() => { setRepeatFor(null); setAdding(true); }}><Icon n="plus" />New enquiry</button>}
       />
 
       <div className="chips" role="tablist" aria-label="Filter by stage">
@@ -182,7 +189,7 @@ export default function Enquiries() {
           <Pager page={d.page} limit={d.limit} total={d.total} onPage={setPage} />
         </Card>
       )}</Async>
-      {adding && <NewEnquiry onClose={() => setAdding(false)} onDone={() => { setAdding(false); state.reload(); counts.reload(); }} />}
+      {adding && <NewEnquiry customer={repeatFor} onClose={() => { setAdding(false); setRepeatFor(null); }} onDone={() => { setAdding(false); setRepeatFor(null); state.reload(); counts.reload(); }} />}
     </>
   );
 }

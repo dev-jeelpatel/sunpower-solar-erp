@@ -1166,3 +1166,24 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .seg-pick button { text-align: left; display: grid; gap: 2px; padding: 10px 13px; border-radius: 12px; border: 1.5px solid var(--border-strong); background: #fff; cursor: pointer; font: inherit; font-weight: 600; color: var(--text); min-height: 58px; }
 .seg-pick button small { color: var(--primary); font-size: .72rem; font-weight: 600; } .seg-pick button:hover { border-color: var(--primary); }
 .seg-pick button.on { border-color: var(--primary); background: #f3f2ff; box-shadow: 0 0 0 3px rgba(99, 91, 255, .14); }
+.cust-sec h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.cust-sec h3 em { font-style: normal; background: var(--surface-2, #eef1f7); color: var(--text-2); border-radius: 999px; padding: 1px 8px; font-size: .7rem; letter-spacing: 0; }
+.cust-link { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--text); text-decoration: none; box-sizing: border-box; max-width: 100%; transition: border-color .15s, box-shadow .15s; }
+.cust-link:hover { border-color: var(--primary); box-shadow: var(--shadow-sm); text-decoration: none; }
+.cust-link .ico { width: 36px; height: 36px; border-radius: 10px; background: #f0efff; color: var(--primary); display: grid; place-items: center; flex: none; } .cust-link .ico svg { width: 18px; height: 18px; }
+.cust-link .txt { display: grid; gap: 2px; flex: 1; min-width: 0; } .cust-link .txt b { color: var(--text); font-size: .95rem; } .cust-link:hover .txt b { color: var(--primary); }
+.cust-link small { color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cust-link .badge { flex: none; white-space: nowrap; }
+
+.app.collapsed .userbox { display: none; }
+
+/* Hover feedback on the sidebar and the newer buttons and cards */
+.nav a { transition: background .15s, color .15s, transform .15s; }
+.nav a:not(.active):hover { transform: translateX(3px); color: var(--primary-dark); }
+.nav a:not(.active):hover .ico { background: var(--primary-soft); color: var(--primary); }
+.suggest-opts button:hover:not(.on), .seg-pick button:hover:not(.on) { background: #f8f9ff; transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.suggest-opts button:active, .seg-pick button:active, .btn.call:active { transform: translateY(1px); }
+.suggest-opts button:focus-visible, .seg-pick button:focus-visible, .btn.call:focus-visible, .cust-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.cust-link:hover .ico { background: var(--primary); color: #fff; }
+.cust-link .ico { transition: background .15s, color .15s; }
+.btn.secondary { transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s; } .btn.secondary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(15, 23, 42, .08); }

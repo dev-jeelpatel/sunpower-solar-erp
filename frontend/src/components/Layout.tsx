@@ -17,23 +17,25 @@ const NAV: [string, NavItem[]][] = [
     ['/quotes', 'Quotes', 'doc', ['sales', 'director']],
     ['/orders', 'Orders', 'box', ['sales', 'warehouse', 'director']],
     ['/invoices', 'Invoices & payments', 'card', ['sales', 'director']],
-    ['/subsidies', 'Subsidy tracker', 'bank', ['sales', 'director']],
-    ['/customers', 'Customers', 'users', ['sales', 'support', 'director']],
   ]],
-  ['Operations', [
-    ['/inventory', 'Inventory', 'warehouse', ['warehouse', 'director']],
+  ['Delivery', [
     ['/dispatch', 'Dispatch', 'truck', ['warehouse', 'director']],
     ['/schedule', 'Schedule', 'calendar', ['sales', 'support', 'technician', 'director']],
     ['/jobs', 'Installation jobs', 'wrench', ['technician', 'sales', 'director']],
+    ['/subsidies', 'Subsidy tracker', 'bank', ['sales', 'director']],
   ]],
   ['After-sales', [
     ['/tickets', 'Service tickets', 'ticket', ['support', 'technician', 'director']],
     ['/claims', 'Warranty claims', 'shield', ['support', 'technician', 'warehouse', 'director']],
     ['/lookup', 'Warranty lookup', 'search', ['support', 'sales', 'warehouse', 'director']],
   ]],
+  ['People & stock', [
+    ['/customers', 'Customers', 'users', ['sales', 'support', 'director']],
+    ['/inventory', 'Inventory', 'warehouse', ['warehouse', 'director']],
+    ['/catalog', 'Products & packages', 'sun', ['warehouse', 'sales', 'director']],
+  ]],
   ['Management', [
     ['/reports', 'Profit & reports', 'chart', ['director']],
-    ['/catalog', 'Products & packages', 'sun', ['warehouse', 'sales', 'director']],
     ['/users', 'Staff', 'shield', []],
   ]],
 ];
@@ -130,9 +132,7 @@ export default function Layout() {
           <Icon n={collapsed ? 'chevR' : 'chevL'} /><span className="nav-tx">Collapse</span>
         </button>
         <div className="userbox">
-          <span className="avatar"><Face seed={user.name} role={user.role} /></span>
           <div className="who"><b>{user.name}</b><span className="role">{label(user.role)}</span></div>
-          <button className="icon-btn" onClick={logout} title="Sign out" aria-label="Sign out"><Icon n="logout" /></button>
         </div>
       </aside>
 

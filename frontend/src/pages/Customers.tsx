@@ -37,15 +37,19 @@ function Detail({ id, onClose, onEdit, onDelete }) {
   return (
     <Modal title="Customer" onClose={onClose} wide footer={state.data && <>
       {can(user) && <button className="btn secondary danger-text" onClick={() => onDelete(state.data)}>Delete</button>}
-      {can(user, 'sales', 'support') && <button className="btn" onClick={() => onEdit(state.data)}>Edit details</button>}
+      {can(user, 'sales', 'support') && <button className="btn secondary" onClick={() => onEdit(state.data)}>Edit details</button>}
+      {can(user, 'sales') && <Link className="btn" to={`/enquiries?newFor=${id}`}><Icon n="plus" />New enquiry for this customer</Link>}
     </>}>
       <Async state={state}>{(c) => (
         <div className="stack">
           <div><h2>{c.name}</h2><div className="muted">{c.phone}{c.email ? ` · ${c.email}` : ''}</div><div>{c.address}{c.city ? `, ${c.city}` : ''}</div></div>
-          <div><h3>Orders</h3>{c.orders.length === 0 ? <span className="muted">None</span> : c.orders.map((o) => <div key={o.id}><Link to={`/orders/${o.id}`}>{o.order_no}</Link> · {money(o.total)} <Badge status={o.status} /></div>)}</div>
-          <div><h3>Equipment & warranty</h3>{c.units.length === 0 ? <span className="muted">No serial-numbered equipment delivered yet</span> :
+          <div className="cust-sec"><h3>Enquiry</h3>{c.enquiries.length === 0 ? <span className="muted">Added directly, no enquiry</span> : c.enquiries.map((e) => (
+            <Link key={e.id} to={`/enquiries/${e.id}`} className="cust-link"><span className="ico"><Icon n="inbox" /></span><span className="txt"><b>Enquiry #{e.id}</b><small>{e.requested_kw} kW {String(e.system_type).replace('_', '-')} · {fmtDate(e.created_at)}</small></span><Badge status={e.status} /></Link>))}</div>
+          <div className="cust-sec"><h3>Orders <em>{c.orders.length}</em></h3>{c.orders.length === 0 ? <span className="muted">No order yet</span> : c.orders.map((o) => (
+            <Link key={o.id} to={`/orders/${o.id}`} className="cust-link"><span className="ico"><Icon n="box" /></span><span className="txt"><b>{o.order_no}</b><small>{o.package_name || 'Custom order'} · {money(o.total)} · {fmtDate(o.created_at)}</small></span><Badge status={o.status} /></Link>))}</div>
+          <div className="cust-sec"><h3>Equipment & warranty <em>{c.units.length}</em></h3>{c.units.length === 0 ? <span className="muted">No serial-numbered equipment delivered yet</span> :
             <div className="table-wrap"><table><tbody>{c.units.map((u) => <tr key={u.serial_no}><td>{u.name}</td><td className="mono">{u.serial_no}</td><td>until {fmtDate(u.warranty_end)}</td><td><Badge status={u.warranty_state} /></td></tr>)}</tbody></table></div>}</div>
-          <div><h3>Service tickets</h3>{c.tickets.length === 0 ? <span className="muted">None</span> : c.tickets.map((t) => <div key={t.id}><Link to={`/tickets/${t.id}`}>{t.ticket_no}</Link> · {t.subject} <Badge status={t.status} /></div>)}</div>
+          <div className="cust-sec"><h3>Service tickets <em>{c.tickets.length}</em></h3>{c.tickets.length === 0 ? <span className="muted">None</span> : c.tickets.map((t) => <div key={t.id}><Link to={`/tickets/${t.id}`}>{t.ticket_no}</Link> · {t.subject} <Badge status={t.status} /></div>)}</div>
         </div>)}</Async>
     </Modal>
   );

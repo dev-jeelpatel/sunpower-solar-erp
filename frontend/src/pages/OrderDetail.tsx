@@ -8,8 +8,8 @@ import { Tracker } from '../components/kit';
 import { validate, required, positive } from '../validators';
 import * as V from '../validators';
 
-export function PaymentModal({ invoice, onClose, onDone, remaining }) {
-  const f = useForm({ amount: remaining ? String(remaining) : '', method: 'upi', reference: '' });
+export function PaymentModal({ invoice, onClose, onDone, remaining, advanceLeft = 0 }: { invoice: any; onClose: () => void; onDone: (r?: any) => void; remaining: number; advanceLeft?: number }) {
+  const f = useForm({ amount: advanceLeft > 0 ? String(advanceLeft) : remaining ? String(remaining) : '', method: 'upi', reference: '' });
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const errs = validate(f.values, { amount: [required('Amount'), positive('Amount'), (v) => (Number(v) > remaining ? `Cannot exceed the balance of ${money(remaining, true)}` : null)] });
@@ -22,6 +22,15 @@ export function PaymentModal({ invoice, onClose, onDone, remaining }) {
   return (
     <Modal title={`Record payment · ${invoice.invoice_no}`} onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" onClick={submit} disabled={busy}>Save payment</button></>}>
       {error && !Object.keys(f.errors).length && <div className="alert bad" style={{ marginBottom: 12 }}>{error}</div>}
+      {advanceLeft > 0 && (
+        <div className="alert warn" style={{ marginBottom: 12 }}>
+          The order is confirmed only after the advance is received. <b>{money(advanceLeft, true)}</b> more is needed. A smaller payment is saved, but the order stays in "Pending payment".
+          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+            <button type="button" className="btn secondary sm" onClick={() => f.set('amount', String(advanceLeft))}>Pay advance {money(advanceLeft, true)}</button>
+            <button type="button" className="btn secondary sm" onClick={() => f.set('amount', String(remaining))}>Pay full balance {money(remaining, true)}</button>
+          </div>
+        </div>
+      )}
       <div className="form-grid">
         <Field label="Amount (₹)" mask="decimal" rules={[V.required('Amount'), V.moneyAmount('Amount', 1, 100000000)]} required error={f.errors.amount} hint={`Balance due ${money(remaining, true)}`}><input type="number" step="0.01" inputMode="decimal" {...f.bind('amount')} /></Field>
         <Field label="Method"><select {...f.bind('method')}>{['upi', 'cash', 'bank_transfer', 'cheque', 'card'].map((m) => <option key={m} value={m}>{label(m)}</option>)}</select></Field>
@@ -110,7 +119,7 @@ export default function OrderDetail() {
                 <dt>Subsidy</dt><dd>{o.subsidy ? <><Link to="/subsidies">{o.subsidy.status.replace('_', ' ')}</Link><div className="muted small">Expected {money(o.subsidy.expected_amount)}</div></> : 'Not applicable'}</dd></dl></Card>
             </div>
           </div>
-          {modal === 'pay' && <PaymentModal invoice={o.invoice} remaining={remaining} onClose={() => setModal(null)} onDone={done} />}
+          {modal === 'pay' && <PaymentModal invoice={o.invoice} remaining={remaining} advanceLeft={o.status === 'pending_payment' ? Math.max(0, Math.round((o.advanceRequired - paid) * 100) / 100) : 0} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'schedule' && <ScheduleTech orderId={o.id} job={o.job} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'cancel' && <Confirm danger title="Cancel this order?" message="The invoice will be voided. This cannot be undone." yesLabel="Cancel order" onNo={() => setModal(null)}
             onYes={async () => { setModal(null); if (await run(() => post(`/orders/${id}/cancel`), 'Order cancelled')) state.reload(); }} />}

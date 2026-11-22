@@ -11,8 +11,8 @@ export const customersService = {
   async get(id: number) {
     const customer = await repo.findById(id);
     if (!customer) throw notFound('Customer');
-    const [orders, units, tickets] = await Promise.all([repo.ordersOf(id), repo.unitsOf(id), repo.ticketsOf(id)]);
-    return { ...customer, orders, units, tickets };
+    const [orders, units, tickets, enquiries] = await Promise.all([repo.ordersOf(id), repo.unitsOf(id), repo.ticketsOf(id), repo.enquiriesOf(id)]);
+    return { ...customer, orders, units, tickets, enquiries };
   },
 
   /** One search box for support: serial number, phone or name. */
