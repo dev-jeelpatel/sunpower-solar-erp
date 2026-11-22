@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { del, get, post, put } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Async, Badge, Card, Confirm, Empty, Field, Modal, PageHead, Seg, fmtDate, fmtDateTime, label, money, useAction, useAsync, useForm } from '../components/ui';
-import { Tracker } from '../components/kit';
+import { Avatar, Tag, Tracker } from '../components/kit';
 import { Icon } from '../components/icons';
 import { validate, required, positive, personName, addressText, cityName, safeText, email as emailRule, phone as phoneRule } from '../validators';
 import * as V from '../validators';
@@ -174,6 +174,28 @@ function QuoteModal({ e, onClose }) {
   );
 }
 
+/** Admin picks who handles this enquiry. The salesperson with the fewest open enquiries is what the system would pick on its own. */
+export function AssignModal({ e, onClose, onDone }) {
+  const people = useAsync(() => get('/enquiries/salespeople'));
+  const [pick, setPick] = useState<number>(e.assigned_to || 0);
+  const { run, busy } = useAction();
+  const save = async () => { if (pick && await run(() => post(`/enquiries/${e.id}/assign`, { assignedTo: pick }), 'Enquiry assigned')) onDone(); };
+  return (
+    <Modal title="Assign enquiry" onClose={onClose} footer={<><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy || !pick || pick === e.assigned_to} onClick={save}>Assign</button></>}>
+      <p className="muted" style={{ marginTop: 0 }}>Who should follow up with {e.customer_name}? The person is notified.</p>
+      <Async state={people}>{(rows: any[]) => (
+        <div className="pick-list">
+          {rows.map((p, i) => (
+            <button type="button" key={p.id} className={pick === p.id ? 'on' : ''} onClick={() => setPick(p.id)}>
+              <Avatar name={p.name} mini role="sales" />
+              <span className="txt"><b>{p.name}</b><small>{p.open} open enquir{p.open === 1 ? 'y' : 'ies'}{p.id === e.assigned_to ? ' · current' : ''}</small></span>
+              {i === 0 && <Tag tone="green">Least busy</Tag>}
+            </button>))}
+        </div>)}</Async>
+    </Modal>
+  );
+}
+
 function ReviewModal({ s, onClose, onDone }) {
   const f = useForm({ notes: '' });
   const [sys, setSys] = useState<string>(s.system_type);
@@ -279,7 +301,7 @@ export default function EnquiryDetail() {
                   <dt>Message</dt><dd>{e.message || '-'}</dd>
                   <dt>Source</dt><dd style={{ textTransform: 'capitalize' }}>{label(e.source)}</dd>
                   {e.customer_id && <><dt>Customer</dt><dd><Link to={`/customers?id=${e.customer_id}`}>Open customer record</Link></dd></>}
-                  <dt>Assigned to</dt><dd>{e.assigned_name || 'Unassigned'}</dd>
+                  <dt>Assigned to</dt><dd>{e.assigned_name || 'Unassigned'}{user.role === 'admin' && <button className="btn secondary sm" style={{ marginLeft: 10 }} onClick={() => setModal('assign')}><Icon n="user" />Change</button>}</dd>
                 </dl>
               </Card>
               <Card title="Phone check">
@@ -299,6 +321,7 @@ export default function EnquiryDetail() {
             </div>
             <Card title="Activity"><ul className="timeline">{e.activity.map((a, i) => <li key={i}><b style={{ textTransform: 'capitalize' }}>{label(a.action.replace('call_logged:', 'call: '))}</b><div className="muted small">{a.user_name || 'Website'} · {fmtDateTime(a.created_at)}</div></li>)}</ul></Card>
           </div>
+          {modal === 'assign' && <AssignModal e={e} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'edit' && <EditEnquiry e={e} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'delete' && <Confirm danger yesLabel="Delete" title="Delete this enquiry?" onNo={() => setModal(null)} onYes={async () => { setModal(null); if (await run(() => del(`/enquiries/${e.id}`), 'Enquiry deleted')) nav('/enquiries'); }} message={<>“{e.customer_name}” and its surveys and history will be removed. Use this for spam or duplicates only.</>} />}
           {modal === 'qualify' && <QualifyModal e={e} onClose={() => setModal(null)} onDone={done} />}

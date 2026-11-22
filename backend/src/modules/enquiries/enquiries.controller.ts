@@ -1,4 +1,5 @@
 import { idOf, paging, str, wrap } from '../../lib/http';
+import { enquiriesRepository } from './enquiries.repository';
 import { enquiriesService } from './enquiries.service';
 
 export const enquiriesController = {
@@ -16,9 +17,10 @@ export const enquiriesController = {
     res.json({ ...r, page, limit });
   }),
 
-  create: wrap(async (req, res) => res.status(201).json(await enquiriesService.create(req.body, req.body.source, req.user.id))),
+  create: wrap(async (req, res) => res.status(201).json(await enquiriesService.create(req.body, req.body.source, req.user.id, req.user.role === 'admin' ? req.body.assignedTo : undefined))),
   get: wrap(async (req, res) => res.json(await enquiriesService.get(idOf(req)))),
   qualify: wrap(async (req, res) => res.json(await enquiriesService.qualify(idOf(req), req.body, req.user.id))),
+  salespeople: wrap(async (_req, res) => res.json(await enquiriesRepository.salespeople())),
   assign: wrap(async (req, res) => res.json(await enquiriesService.assign(idOf(req), req.body.assignedTo, req.user.id))),
   update: wrap(async (req, res) => res.json(await enquiriesService.update(idOf(req), req.body, req.user.id))),
   remove: wrap(async (req, res) => res.json(await enquiriesService.remove(idOf(req)))),

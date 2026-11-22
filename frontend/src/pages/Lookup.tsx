@@ -15,13 +15,18 @@ export default function Lookup() {
   const dq = useDebounced(q, 250);
   const [unit, setUnit] = useState<any>(null);
   const [err, setErr] = useState('');
+  const [owner, setOwner] = useState<any>(null); // a customer picked from the matches, with their equipment
   const [raising, setRaising] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const results = useAsync(() => (dq.trim().length >= 3 ? get(`/search?q=${encodeURIComponent(dq.trim())}`) : Promise.resolve({ units: [], customers: [] })), [dq]);
 
   const open = async (serial: string) => {
     setErr(''); setUnit(null);
-    try { setUnit(await get(`/inventory/units/lookup/${encodeURIComponent(serial)}`)); setParams({ serial }); } catch (e) { setErr(e.message); }
+    try { setOwner(null); setUnit(await get(`/inventory/units/lookup/${encodeURIComponent(serial)}`)); setParams({ serial }); } catch (e) { setErr(e.message); }
+  };
+  const openCustomer = async (id: number) => {
+    setErr(''); setUnit(null);
+    try { setOwner(await get(`/customers/${id}`)); } catch (e) { setErr(e.message); }
   };
   useEffect(() => { if (params.get('serial')) open(params.get('serial') as string); }, []); // eslint-disable-line
 
@@ -54,13 +59,27 @@ export default function Lookup() {
                     <td><Badge status={u.warranty_state} /></td>
                   </tr>))}
                 {r.customers.map((c) => (
-                  <tr key={`c${c.id}`}><td colSpan={3}><Person name={c.name} sub={`${c.phone}${c.city ? ` · ${c.city}` : ''}`} /></td></tr>))}
+                  <tr key={`c${c.id}`} className="clickable" onClick={() => openCustomer(c.id)}><td colSpan={3}><Person name={c.name} sub={`${c.phone}${c.city ? ` · ${c.city}` : ''}`} /></td></tr>))}
               </tbody></table></div></Card>)}
             {r && dq.length >= 3 && r.units.length === 0 && r.customers.length === 0 && <div className="alert info">No matches for “{dq}”.</div>}
             {!r?.units?.length && !r?.customers?.length && dq.length < 3 && !unit && (
               <Card><div className="empty"><span className="empty-ic"><Icon n="search" /></span><p>Start typing to search units and customers.</p></div></Card>)}
           </div>
 
+          {owner && !unit && (
+            <Card title={`${owner.name}'s equipment`} pad={false} actions={<Link className="btn secondary sm" to={`/customers?id=${owner.id}`}>Open customer</Link>}>
+              <div className="muted small" style={{ padding: '4px 18px 10px' }}>{owner.phone}{owner.city ? ` · ${owner.city}` : ''}</div>
+              {owner.units.length === 0 ? <div className="empty">No serial-numbered equipment delivered yet</div> : (
+                <div className="table-wrap"><table><tbody>
+                  {owner.units.map((u) => (
+                    <tr key={u.serial_no} className="clickable" onClick={() => open(u.serial_no)}>
+                      <td><b>{u.name}</b><span className="sub-line"><span className="mono">{u.serial_no}</span></span></td>
+                      <td className="nowrap">until {fmtDate(u.warranty_end)}</td>
+                      <td><Badge status={u.warranty_state} /></td>
+                    </tr>))}
+                </tbody></table></div>)}
+            </Card>
+          )}
           {unit && (
             <div>
               <div className={`lk-status ${state}`}>

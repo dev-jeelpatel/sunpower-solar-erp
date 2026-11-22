@@ -4,6 +4,7 @@ import { get, post } from '../api';
 import { useCurrentUser, can } from '../auth';
 import { Icon, type IconName } from '../components/icons';
 import { Avatar } from '../components/kit';
+import { AssignModal } from './EnquiryDetail';
 import { Badge, Card, Empty, Field, Loading, Modal, PageHead, Pager, label, fmtDate, useAction, useAsync, useDebounced, useForm, useToast, Async } from '../components/ui';
 import { validate, required, personName, addressText, email, phone, normPhone, range } from '../validators';
 import * as V from '../validators';
@@ -11,14 +12,16 @@ import * as V from '../validators';
 const STATUSES = ['new', 'contacted', 'qualified', 'survey_scheduled', 'survey_approved', 'quoted', 'won', 'lost'];
 
 function NewEnquiry({ onClose, onDone, customer }: { onClose: () => void; onDone: () => void; customer?: any }) {
-  const f = useForm({ name: customer?.name || '', phone: customer?.phone || '', email: customer?.email || '', address: customer?.address || '', city: customer?.city || '', requestedKw: '3', systemType: 'on_grid', source: 'call', subsidyRequired: false, message: '' });
+  const f = useForm({ name: customer?.name || '', phone: customer?.phone || '', email: customer?.email || '', address: customer?.address || '', city: customer?.city || '', requestedKw: '3', systemType: 'on_grid', source: 'call', subsidyRequired: false, message: '', assignedTo: '' });
+  const admin = useCurrentUser().role === 'admin';
+  const people = useAsync(() => (admin ? get('/enquiries/salespeople') : Promise.resolve([])), [admin]);
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const v = f.values;
     const errs = validate(v, { name: [required('Name'), personName('Name')], phone: [required('Phone'), phone], email: [email], address: [required('Address'), addressText('Address')], requestedKw: [range(1, 5, 'System size')] });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
-    const ok = await run(() => post('/enquiries', { ...v, phone: normPhone(v.phone), requestedKw: Number(v.requestedKw) }), 'Enquiry added');
+    const ok = await run(() => post('/enquiries', { ...v, phone: normPhone(v.phone), requestedKw: Number(v.requestedKw), assignedTo: v.assignedTo ? Number(v.assignedTo) : undefined }), 'Enquiry added');
     if (ok) onDone();
   };
   return (
@@ -34,6 +37,14 @@ function NewEnquiry({ onClose, onDone, customer }: { onClose: () => void; onDone
         <Field label="Size (kW)" error={f.errors.requestedKw}><select {...f.bind('requestedKw')}>{[1, 2, 3, 4, 5].map((k) => <option key={k}>{k}</option>)}</select></Field>
         <Field label="Type"><select {...f.bind('systemType')}><option value="on_grid">On-Grid</option><option value="off_grid">Off-Grid</option></select></Field>
         <Field label="Came in via"><select {...f.bind('source')}><option value="call">Phone call</option><option value="whatsapp">WhatsApp</option><option value="walk_in">Walk-in</option><option value="web">Web</option></select></Field>
+        {admin && (
+          <Field label="Assign to" hint="Left on automatic, the least busy salesperson gets it">
+            <select {...f.bind('assignedTo')}>
+              <option value="">Automatic{people.data?.[0] ? `: ${people.data[0].name} (least busy)` : ''}</option>
+              {(people.data || []).map((p: any) => <option key={p.id} value={p.id}>{p.name} · {p.open} open</option>)}
+            </select>
+          </Field>
+        )}
         <label className="check"><input type="checkbox" checked={f.values.subsidyRequired} onChange={(e) => f.set('subsidyRequired', e.target.checked)} /> Wants subsidy</label>
         <Field label="Notes" mask="text" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('message')} /></Field>
       </div>
@@ -116,6 +127,7 @@ export default function Enquiries() {
   const [all, setAll] = useState(true); // salespeople see every enquiry by default; "Assigned to me" narrows it
   const [adding, setAdding] = useState(false);
   const [repeatFor, setRepeatFor] = useState<any>(null);
+  const [assigning, setAssigning] = useState<any>(null); // admin: enquiry whose salesperson is being changed
   const newFor = params.get('newFor'); // the customer window links here to start a repeat enquiry
   useEffect(() => {
     if (!newFor) return;
@@ -180,7 +192,11 @@ export default function Enquiries() {
                 <td><RequestCell e={e} /></td>
                 <td><span className="ico-txt"><Icon n="pin" />{e.city || '-'}</span></td>
                 <td><span className="src"><Icon n={SOURCE_ICON[e.source] || 'inbox'} />{SOURCE_LABEL[e.source] || label(e.source)}</span></td>
-                <td>{e.assigned_name ? <span className="who"><Avatar name={e.assigned_name} mini role="sales" />{e.assigned_name}</span> : <span className="muted">Unassigned</span>}</td>
+                <td>{user.role === 'admin'
+                  ? <button type="button" className="assign-btn" title="Change who handles this enquiry" onClick={(ev) => { ev.stopPropagation(); setAssigning(e); }}>
+                      {e.assigned_name ? <><Avatar name={e.assigned_name} mini role="sales" />{e.assigned_name}</> : <span className="muted">Unassigned</span>}<Icon n="chevD" />
+                    </button>
+                  : e.assigned_name ? <span className="who"><Avatar name={e.assigned_name} mini role="sales" />{e.assigned_name}</span> : <span className="muted">Unassigned</span>}</td>
                 <td className="nowrap"><b className="soft">{ago(e.created_at)}</b><div className="muted small">{fmtDate(e.created_at)}</div></td>
                 <td><Badge status={e.status} /></td>
                 <td className="num"><a className="callbtn" href={`tel:${e.phone}`} onClick={(ev) => ev.stopPropagation()} title={`Call ${e.customer_name}`} aria-label={`Call ${e.customer_name}`}><Icon n="phone" /></a></td>
@@ -189,6 +205,7 @@ export default function Enquiries() {
           <Pager page={d.page} limit={d.limit} total={d.total} onPage={setPage} />
         </Card>
       )}</Async>
+      {assigning && <AssignModal e={assigning} onClose={() => setAssigning(null)} onDone={() => { setAssigning(null); state.reload(); }} />}
       {adding && <NewEnquiry customer={repeatFor} onClose={() => { setAdding(false); setRepeatFor(null); }} onDone={() => { setAdding(false); setRepeatFor(null); state.reload(); counts.reload(); }} />}
     </>
   );

@@ -14,6 +14,15 @@ export const enquiriesRepository = {
     return r?.id ?? null;
   },
 
+  /** Active salespeople with how many open enquiries each has. The first one is who the system picks by default. */
+  salespeople: () =>
+    q<{ id: number; name: string; open: number }>(
+      prisma,
+      `SELECT u.id, u.name,
+              (SELECT count(*) FROM enquiries e WHERE e.assigned_to = u.id AND e.status IN ('new','contacted'))::int AS open
+         FROM users u WHERE u.role = 'sales' AND u.active ORDER BY open, u.id`,
+    ),
+
   async insert(db: Db, d: EnquiryInput, source: string, assignee: number | null) {
     const rows = await q(
       db,

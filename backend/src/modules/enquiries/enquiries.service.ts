@@ -1,13 +1,14 @@
 import { notFound, unprocessable } from '../../lib/errors';
 import { logActivity, prisma, tx } from '../../lib/prisma';
-import { notify } from '../../realtime/socket';
+import { notify, notifyUsers } from '../../realtime/socket';
 import { enquiriesRepository as repo } from './enquiries.repository';
 import type { EnquiryInput, QualifyInput } from './enquiries.schema';
 
 export const enquiriesService = {
-  async create(data: EnquiryInput, source: string, userId: number | null = null) {
+  async create(data: EnquiryInput, source: string, userId: number | null = null, chosen?: number) {
+    if (chosen && !(await repo.isActiveSalesperson(chosen))) throw unprocessable('Choose an active salesperson', { assignedTo: 'Not a sales user' });
     const enquiry = await tx(async (db) => {
-      const assignee = await repo.pickSalesperson(db);
+      const assignee = chosen ?? (await repo.pickSalesperson(db));
       const row = await repo.insert(db, data, source, assignee);
       await logActivity(db, 'enquiry', row.id, 'created', userId, { source });
       return row;
@@ -59,6 +60,7 @@ export const enquiriesService = {
     const row = await repo.assign(id, userId);
     if (!row) throw notFound('Enquiry');
     await logActivity(prisma, 'enquiry', id, 'reassigned', actorId, { to: userId });
+    if (userId !== actorId) notifyUsers([userId], 'enquiry:new', { title: `An enquiry was assigned to you: ${row.customer_name}`, link: `/enquiries/${id}` });
     return row;
   },
 

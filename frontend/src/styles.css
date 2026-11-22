@@ -1187,3 +1187,14 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .cust-link:hover .ico { background: var(--primary); color: #fff; }
 .cust-link .ico { transition: background .15s, color .15s; }
 .btn.secondary { transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .15s; } .btn.secondary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(15, 23, 42, .08); }
+
+.pick-list { display: grid; gap: 8px; }
+.pick-list button { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; border: 1.5px solid var(--border-strong); border-radius: 12px; background: #fff; cursor: pointer; font: inherit; color: var(--text); transition: border-color .15s, background .15s, transform .15s; }
+.pick-list button:hover:not(.on) { background: #f8f9ff; border-color: #b7bffa; transform: translateY(-1px); }
+.pick-list button.on { border-color: var(--primary); background: #f3f2ff; box-shadow: 0 0 0 3px rgba(99, 91, 255, .14); }
+.pick-list .txt { display: grid; gap: 1px; flex: 1; } .pick-list small { color: var(--muted); font-size: .78rem; }
+
+.assign-btn { display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; margin: -4px; border: 1px solid transparent; border-radius: 999px; background: none; font: inherit; color: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+.assign-btn svg:last-child { width: 14px; height: 14px; color: var(--muted); }
+.assign-btn:hover { background: #fff; border-color: var(--border-strong); box-shadow: var(--shadow-sm); } .assign-btn:hover svg:last-child { color: var(--primary); }
+.assign-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

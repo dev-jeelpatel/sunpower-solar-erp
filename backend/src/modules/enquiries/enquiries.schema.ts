@@ -19,6 +19,8 @@ export type EnquiryInput = z.infer<typeof enquirySchema>;
 
 export const staffEnquirySchema = enquirySchema.extend({
   source: z.enum(['web', 'whatsapp', 'call', 'walk_in']).default('call'),
+  /** Admin only: choose the salesperson. Left out, the system picks the least busy one. */
+  assignedTo: z.preprocess((v) => (v === '' || v === null ? undefined : v), id('Salesperson').optional()),
 });
 
 const blank = (v: unknown) => (v === '' || v === null ? undefined : v);
