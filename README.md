@@ -9,25 +9,39 @@ service tickets and profit reports. It also includes a customer-facing website.
 
 ---
 
+## Screenshots
+
+| | |
+|---|---|
+| <a href="docs/screenshots/01-website-home.webp"><img src="docs/screenshots/01-website-home.webp" alt="Customer website: free-quote form, subsidy and warranty highlights"></a><br><sub>Customer website: free-quote form, subsidy and warranty highlights</sub> | <a href="docs/screenshots/02-website-why-sunpower.webp"><img src="docs/screenshots/02-website-why-sunpower.webp" alt="Customer website: why SunPower"></a><br><sub>Customer website: why SunPower</sub> |
+| <a href="docs/screenshots/03-login.webp"><img src="docs/screenshots/03-login.webp" alt="Staff login with one-click demo roles"></a><br><sub>Staff login with one-click demo roles</sub> | <a href="docs/screenshots/04-dashboard.png"><img src="docs/screenshots/04-dashboard.png" alt="Dashboard: KPIs, revenue chart and the "Needs attention" list"></a><br><sub>Dashboard: KPIs, revenue chart and the "Needs attention" list</sub> |
+| <a href="docs/screenshots/05-new-enquiry.png"><img src="docs/screenshots/05-new-enquiry.png" alt="New enquiry: admin can assign a salesperson, or leave it on automatic (least busy)"></a><br><sub>New enquiry: admin can assign a salesperson, or leave it on automatic (least busy)</sub> | <a href="docs/screenshots/06-site-surveys.png"><img src="docs/screenshots/06-site-surveys.png" alt="Site surveys: contact, map link, measurements and the technician's on-grid / off-grid suggestion"></a><br><sub>Site surveys: contact, map link, measurements and the technician's on-grid / off-grid suggestion</sub> |
+| <a href="docs/screenshots/07-invoice.png"><img src="docs/screenshots/07-invoice.png" alt="Invoice with itemised parts, GST and print / PDF"></a><br><sub>Invoice with itemised parts, GST and print / PDF</sub> | <a href="docs/screenshots/08-dispatch.png"><img src="docs/screenshots/08-dispatch.png" alt="Dispatch pick list: scan or tap serial numbers before the truck leaves"></a><br><sub>Dispatch pick list: scan or tap serial numbers before the truck leaves</sub> |
+| <a href="docs/screenshots/09-schedule.webp"><img src="docs/screenshots/09-schedule.webp" alt="Schedule: calendar and route map of the day's installations"></a><br><sub>Schedule: calendar and route map of the day's installations</sub> | <a href="docs/screenshots/10-installation-jobs.png"><img src="docs/screenshots/10-installation-jobs.png" alt="Installation jobs: crew assignment after delivery"></a><br><sub>Installation jobs: crew assignment after delivery</sub> |
+| <a href="docs/screenshots/11-products-packages.png"><img src="docs/screenshots/11-products-packages.png" alt="Products and packages: bill of materials per package"></a><br><sub>Products and packages: bill of materials per package</sub> | <a href="docs/screenshots/12-staff.png"><img src="docs/screenshots/12-staff.png" alt="Staff: roles and access"></a><br><sub>Staff: roles and access</sub> |
+
+---
+
 ## Contents
 
-1. [What is in the box](#what-is-in-the-box)
-2. [Tech stack](#tech-stack)
-3. [Quick start](#quick-start)
-4. [Demo accounts](#demo-accounts)
-5. [Project structure](#project-structure)
-6. [Business flow and rules](#business-flow-and-rules)
-7. [Roles and permissions](#roles-and-permissions)
-8. [Database design](#database-design)
-9. [API reference](#api-reference)
-10. [Frontend](#frontend)
-11. [Security](#security)
-12. [Real-time notifications](#real-time-notifications)
-13. [Configuration](#configuration)
-14. [Scripts](#scripts)
-15. [Testing](#testing)
-16. [Troubleshooting](#troubleshooting)
-17. [Known limitations and next steps](#known-limitations-and-next-steps)
+1. [Screenshots](#screenshots)
+2. [What is in the box](#what-is-in-the-box)
+3. [Tech stack](#tech-stack)
+4. [Quick start](#quick-start)
+5. [Demo accounts](#demo-accounts)
+6. [Project structure](#project-structure)
+7. [Business flow and rules](#business-flow-and-rules)
+8. [Roles and permissions](#roles-and-permissions)
+9. [Database design](#database-design)
+10. [API reference](#api-reference)
+11. [Frontend](#frontend)
+12. [Security](#security)
+13. [Real-time notifications](#real-time-notifications)
+14. [Configuration](#configuration)
+15. [Scripts](#scripts)
+16. [Testing](#testing)
+17. [Troubleshooting](#troubleshooting)
+18. [Known limitations and next steps](#known-limitations-and-next-steps)
 
 ---
 
@@ -51,11 +65,14 @@ service tickets and profit reports. It also includes a customer-facing website.
 
 | Area | Pages |
 |---|---|
-| Overview | Dashboard with KPI cards, collections chart, attention list, sales pipeline, low stock, quick actions |
-| Sales | Enquiries (list and board view), Site surveys, Quotes, Orders, Invoices and payments, Subsidy tracker, Customers |
-| Operations | Inventory (stock, serial numbers, purchases), Dispatch, Installation jobs |
-| After-sales | Service tickets, Warranty lookup |
-| Management | Profit and reports (profitability, unfinished work, technician payouts, CSV export), Products and packages, Staff |
+| Overview | Dashboard with KPI cards, revenue chart (cash collected vs new orders, 3/6/12 months), "Needs attention" list and sales pipeline |
+| Sales | Enquiries (list and board view), Site surveys, Quotes, Orders, Invoices and payments |
+| Delivery | Dispatch, Schedule (calendar and route map), Installation jobs, Subsidy tracker |
+| After-sales | Service tickets, Warranty claims, Warranty lookup |
+| People and stock | Customers, Inventory (stock, serial numbers, purchases), Products and packages |
+| Management | Profit and reports (profitability, unfinished work, technician payouts, CSV export), Staff |
+
+The sidebar follows the real workflow, top to bottom: sales, delivery, after-sales, then people and stock.
 
 Highlights: order-tracking style progress on enquiries and orders, a **Ctrl+K quick search**, a collapsible sidebar,
 role-based navigation, summary cards and filter chips on every list, and a layout that works on phones.
@@ -158,7 +175,7 @@ sunpower-solar-erp/
 │   │   └── seed/seed.ts           demo data: staff, catalogue, stock, pipeline, history
 │   ├── scripts/
 │   │   ├── dev-db.ts              embedded PostgreSQL for development
-│   │   └── e2e.cjs                end-to-end check of the whole business flow (73 checks)
+│   │   └── e2e.cjs                end-to-end check of the whole business flow (93 checks)
 │   ├── uploads/                   installation photos (git-ignored)
 │   └── src/
 │       ├── app.ts, server.ts      Express app and HTTP + Socket.IO server
@@ -195,16 +212,18 @@ Enquiry -> phone qualification -> site survey (approved) -> quote -> order + inv
 
 | Step | What happens |
 |---|---|
-| Enquiry | Arrives from the website, WhatsApp, a call or a walk-in. Auto-assigned to the least-loaded active salesperson |
+| Enquiry | Arrives from the website, WhatsApp, a call or a walk-in. Auto-assigned to the least-loaded active salesperson. **Admin can choose the salesperson** when adding an enquiry, or change it later from the list or the enquiry page (the person is notified) |
 | Qualify | Sales logs the call: shadow-free area, monthly bill, grid suitability. Outcome: qualified, contacted again, or not suitable |
-| Survey | Sales books a technician. The technician submits roof direction, tilt, cable run and usable area. Sales approves or rejects |
+| Survey | Sales books a technician. The technician submits roof direction, tilt, cable run and usable area, and **recommends on-grid, off-grid or neither** (with a reason). Sales approves or rejects, and when approving can keep the customer's choice or switch to the technician's suggestion |
 | Quote | Created from a package (bill of materials copied automatically), GST added, valid 15 days. Send, reject or accept |
 | Accept | Creates the customer, order, order items (with cost snapshot), invoice, and a subsidy file for on-grid orders that asked for one |
 | Advance | The first payment that reaches the advance % confirms the order: a dispatch is created and the least-loaded technician is scheduled about 3 working days out |
 | Dispatch | The warehouse scans each serial number onto the order. The truck cannot leave until every serial-tracked item is scanned. Bulk items are deducted from stock |
 | Delivery | Marking delivered starts the warranty clock on every serial of that dispatch |
 | Install | The technician uploads photos and records the finish time and installed size. The customer signs on screen |
+| Repeat purchase | In the customer window, **New enquiry for this customer** opens the enquiry form with their details filled in. The mobile number links the new order to the same customer |
 | Support | A ticket is raised from the customer's **mobile number** (staff see everything the customer owns and pick the faulty item) or from a serial number. In warranty it is free. Out of warranty, an invoice for parts and labour is generated. A replacement serial swaps the faulty unit and starts a new warranty |
+| Subsidy | A file is opened automatically for on-grid orders that asked for it. Staff move it through documents pending, submitted, approved and disbursed (or rejected, with a reason), with search, status and sort dropdowns |
 
 **Constants** (`backend/src/config/env.ts`): advance 30% (`ADVANCE_PERCENT`), GST 5% (`GST_PERCENT`), quote validity 15 days.
 **Subsidy** (PM Surya Ghar): Rs 30,000 per kW up to 2 kW, capped at Rs 78,000 from 3 kW.
@@ -296,7 +315,7 @@ Every list has the actions it needs, and each delete follows a safety rule so hi
 | Scan, dispatch, mark delivered | | deliver | ✓ | | |
 | Create and resolve service tickets, warranty lookup | create | resolve | lookup | ✓ | view |
 | Profit and reports, technician payouts | | | | | ✓ |
-| Staff management, packages | admin only | | | | |
+| Staff management, packages, **assign an enquiry to a salesperson** | admin only | | | | |
 
 Technicians only see surveys and jobs assigned to them. Every write route is checked on the server.
 
@@ -438,10 +457,10 @@ Every value is checked twice: in the browser for instant feedback, and on the se
 ## Real-time notifications
 
 The API runs a Socket.IO server. Browsers authenticate with their JWT and join a room per role and per user.
-Currently the **new web or staff enquiry** event is pushed to the `sales` role (admin and director are always included).
-Other event names (survey submitted, order confirmed, payment received, dispatch ready, job scheduled, and so on) are
-defined in `backend/src/realtime/socket.ts` and ready to be wired in. The web app does not yet subscribe to the socket
-and show live toasts (see next steps).
+Events (new enquiry, survey scheduled or submitted, order confirmed, payment received, dispatch ready, job scheduled,
+ticket and claim updates, low stock, and so on) are saved as one row per person in the `notifications` table and pushed
+live. The **notification bell** in the top bar shows an unread count, a saved history and mark-as-read, so nothing is
+lost if someone was offline. See [Notification bell](#notification-bell).
 
 ---
 
@@ -497,7 +516,7 @@ The web dev server proxies `/api` and `/uploads` to `http://localhost:4000` (see
 ## Testing
 
 `npm run e2e -- --confirm` (in `backend`, with the API and a throwaway database running; it adds test records) walks the whole business flow over HTTP and prints
-**73 checks**: login and roles, enquiry to qualification, survey, quote and order, payment confirming the order,
+**93 checks**: login and roles, enquiry to qualification, survey, quote and order, payment confirming the order,
 dispatch with serial scanning, delivery, installation sign-off, tickets in and out of warranty, director reports, and
 the negative cases (duplicate serial, invalid vehicle number, wrong role, over-payment, and so on).
 
@@ -522,9 +541,8 @@ The script **creates its own records**, so run it on a development database. Re-
 
 - Styling is a hand-written CSS design system, not Tailwind. Forms use a small in-house form helper, not React Hook Form.
 - API responses are typed loosely on most frontend pages; shared response types would tighten this.
-- The Socket.IO server only emits the new-enquiry event, and the web app does not yet show live notifications.
 - The Swagger page documents the core endpoints; the table above lists every route.
 - The mobile-number warranty check needs an SMS provider in production. `sendSms()` in `backend/src/modules/public/otp.service.ts` is the one place to plug MSG91, Twilio or similar in. Until then the check works in demo mode only (`OTP_DEMO=true`) and the serial-number check works everywhere. Codes are kept in memory, which suits a single API instance.
 - Payments are recorded manually (cash, UPI, bank transfer, cheque, card). There is no payment-gateway integration.
-- There are no unit tests; confidence comes from the 73-check end-to-end script and the database rules.
+- There are no unit tests; confidence comes from the end-to-end scripts (main flow and warranty claims) and the database rules.
 - Summary cards on list pages use the latest 100 records, which matters once a list grows beyond that.
