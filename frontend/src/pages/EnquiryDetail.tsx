@@ -176,11 +176,24 @@ function QuoteModal({ e, onClose }) {
 
 function ReviewModal({ s, onClose, onDone }) {
   const f = useForm({ notes: '' });
+  const [sys, setSys] = useState<string>(s.system_type);
   const { run, busy } = useAction();
-  const go = async (decision) => { if (await run(() => post(`/surveys/${s.id}/review`, { decision, notes: f.values.notes }), decision === 'approve' ? 'Survey approved' : 'Survey rejected')) onDone(); };
+  const go = async (decision) => { if (await run(() => post(`/surveys/${s.id}/review`, { decision, notes: f.values.notes, ...(decision === 'approve' ? { systemType: sys } : {}) }), decision === 'approve' ? 'Survey approved' : 'Survey rejected')) onDone(); };
   return (
     <Modal title="Review survey" onClose={onClose} footer={<><button className="btn danger" disabled={busy} onClick={() => go('reject')}>Reject</button><button className="btn ok" disabled={busy} onClick={() => go('approve')}>Approve</button></>}>
-      <dl className="kv"><dt>Roof direction</dt><dd>{s.roof_direction}</dd><dt>Tilt</dt><dd>{s.roof_tilt_deg}°</dd><dt>Cable distance</dt><dd>{s.cable_distance_m} m</dd><dt>Usable area</dt><dd>{s.usable_area_sqft} sq ft</dd><dt>Technician notes</dt><dd>{s.notes || '-'}</dd></dl>
+      <dl className="kv"><dt>Roof direction</dt><dd>{s.roof_direction}</dd><dt>Tilt</dt><dd>{s.roof_tilt_deg}°</dd><dt>Cable distance</dt><dd>{s.cable_distance_m} m</dd><dt>Usable area</dt><dd>{s.usable_area_sqft} sq ft</dd><dt>Technician suggests</dt><dd>{s.suggested_system_type ? <b>{s.suggested_system_type === 'none' ? 'Neither: solar not suitable' : label(s.suggested_system_type)}</b> : '-'}{s.suggested_system_type && s.suggested_system_type !== 'none' && s.suggested_system_type !== s.system_type && <span className="muted small"> (customer asked for {label(s.system_type)})</span>}{s.suggestion_reason && <div className="muted small">{s.suggestion_reason}</div>}</dd><dt>Technician notes</dt><dd>{s.notes || '-'}</dd></dl>
+      <div className="stack" style={{ gap: 6, margin: '12px 0' }}>
+        <b style={{ fontSize: '.85rem' }}>System for the quote</b>
+        <div className="seg-pick">
+          {(['on_grid', 'off_grid'] as const).map((t) => (
+            <button type="button" key={t} className={sys === t ? 'on' : ''} onClick={() => setSys(t)}>
+              {label(t)}
+              <small>{t === s.system_type ? 'Customer asked for this' : ''}{t === s.suggested_system_type ? `${t === s.system_type ? ' · ' : ''}Technician suggests this` : ''}</small>
+            </button>))}
+        </div>
+        {sys !== s.system_type && <span className="muted small">The enquiry will change from {label(s.system_type)} to {label(sys)} when you approve.</span>}
+        {s.suggested_system_type && s.suggested_system_type !== sys && s.suggested_system_type !== 'none' && <span className="muted small">If the customer insists on {label(sys)}, you can keep it. The technician's advice stays on record.</span>}
+      </div>
       <Field label="Review notes" mask="text" rules={[V.safeText('Review notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
     </Modal>
   );
@@ -277,7 +290,7 @@ export default function EnquiryDetail() {
               <Card title="Site surveys" pad={false}>
                 {e.surveys.length === 0 ? <Empty>No survey booked</Empty> : <div className="table-wrap"><table><thead><tr><th>Date</th><th>Technician</th><th>Roof</th><th>Status</th></tr></thead>
                   <tbody>{e.surveys.map((s) => <tr key={s.id}><td>{fmtDate(s.scheduled_date)}</td><td>{s.technician_name}</td>
-                    <td>{s.roof_direction ? `${s.roof_direction}-facing, ${s.roof_tilt_deg}° tilt, ${s.cable_distance_m} m cable` : '-'}</td><td><Badge status={s.status} /></td></tr>)}</tbody></table></div>}
+                    <td>{s.roof_direction ? `${s.roof_direction}-facing, ${s.roof_tilt_deg}° tilt, ${s.cable_distance_m} m cable` : '-'}{s.suggested_system_type && <div className="muted small">{s.suggested_system_type === 'none' ? 'Suggests neither' : `Suggests ${label(s.suggested_system_type)}`}{s.suggestion_reason ? `: ${s.suggestion_reason}` : ''}</div>}</td><td><Badge status={s.status} /></td></tr>)}</tbody></table></div>}
               </Card>
               <Card title="Quotes" pad={false}>
                 {e.quotes.length === 0 ? <Empty>Quotes can be created once the survey is approved</Empty> : <div className="table-wrap"><table><tbody>
@@ -291,7 +304,7 @@ export default function EnquiryDetail() {
           {modal === 'qualify' && <QualifyModal e={e} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'survey' && <SurveyModal e={e} onClose={() => setModal(null)} onDone={done} />}
           {modal === 'quote' && <QuoteModal e={e} onClose={() => setModal(null)} />}
-          {modal === 'review' && toReview && <ReviewModal s={toReview} onClose={() => setModal(null)} onDone={done} />}
+          {modal === 'review' && toReview && <ReviewModal s={{ ...toReview, system_type: e.system_type }} onClose={() => setModal(null)} onDone={done} />}
         </>
       );
     }}</Async>

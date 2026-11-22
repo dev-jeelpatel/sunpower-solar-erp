@@ -84,7 +84,7 @@ async function login(name) {
   const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
   const survey = await ok('schedule survey', call('POST', '/surveys', { token: tokens.sales, body: { enquiryId, technicianId: tech1.id, scheduledDate: tomorrow } }), 201);
   await fails('quote blocked before survey approved', call('POST', '/quotes', { token: tokens.sales, body: { enquiryId, packageId: pkg.id } }), 422, 'survey');
-  await ok('technician submits survey', call('POST', `/surveys/${survey.id}/complete`, { token: tokens.tech1, body: { roofDirection: 'S', roofTiltDeg: 18, cableDistanceM: 22, usableAreaSqft: 400 } }));
+  await ok('technician submits survey', call('POST', `/surveys/${survey.id}/complete`, { token: tokens.tech1, body: { roofDirection: 'S', roofTiltDeg: 18, cableDistanceM: 22, usableAreaSqft: 400, suggestedSystemType: 'on_grid' } }));
   await ok('sales approves survey', call('POST', `/surveys/${survey.id}/review`, { token: tokens.sales, body: { decision: 'approve' } }));
   const quote = await ok('quote created from package template', call('POST', '/quotes', { token: tokens.sales, body: { enquiryId, packageId: pkg.id, discount: 2000 } }), 201);
   assert.equal(quote.items.length, pkg.items.length);

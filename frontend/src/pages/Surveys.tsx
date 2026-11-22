@@ -24,11 +24,11 @@ function ContactCard({ s }: { s: any }) {
 }
 
 function SurveyForm({ s, onClose, onDone }) {
-  const f = useForm({ roofDirection: '', roofTiltDeg: '', cableDistanceM: '', usableAreaSqft: '', notes: '' });
+  const f = useForm({ roofDirection: '', roofTiltDeg: '', cableDistanceM: '', usableAreaSqft: '', suggestedSystemType: '', suggestionReason: '', notes: '' });
   const { run, busy, error } = useAction(f.setErrors);
   const submit = async () => {
     const v = f.values;
-    const errs = validate(v, { roofDirection: [required('Roof direction')], roofTiltDeg: [required('Tilt'), range(0, 90, 'Tilt')], cableDistanceM: [required('Cable distance'), range(0, 500, 'Cable distance')], usableAreaSqft: [required('Usable area'), positive('Usable area')] });
+    const errs = validate(v, { roofDirection: [required('Roof direction')], roofTiltDeg: [required('Tilt'), range(0, 90, 'Tilt')], cableDistanceM: [required('Cable distance'), range(0, 500, 'Cable distance')], usableAreaSqft: [required('Usable area'), positive('Usable area')], suggestedSystemType: [required('Your recommendation')], ...(v.suggestedSystemType === 'none' ? { suggestionReason: [required('A reason')] } : {}) });
     f.setErrors(errs);
     if (Object.keys(errs).length) return;
     const ok = await run(() => post(`/surveys/${s.id}/complete`, { ...v, roofTiltDeg: Number(v.roofTiltDeg), cableDistanceM: Number(v.cableDistanceM), usableAreaSqft: Number(v.usableAreaSqft) }), 'Survey submitted for approval');
@@ -43,6 +43,16 @@ function SurveyForm({ s, onClose, onDone }) {
         <Field label="Roof tilt (°)" mask="decimal" rules={[V.required('Tilt'), V.range(0, 90, 'Tilt')]} required error={f.errors.roofTiltDeg}><input type="number" inputMode="decimal" {...f.bind('roofTiltDeg')} /></Field>
         <Field label="Cable run (m)" mask="decimal" rules={[V.required('Cable distance'), V.range(0, 500, 'Cable distance')]} required error={f.errors.cableDistanceM}><input type="number" inputMode="decimal" {...f.bind('cableDistanceM')} /></Field>
         <Field label="Usable roof area (sq ft)" mask="decimal" rules={[V.required('Usable area'), V.positive('Usable area')]} required error={f.errors.usableAreaSqft}><input type="number" inputMode="decimal" {...f.bind('usableAreaSqft')} /></Field>
+        <div className="full suggest">
+          <span className="lbl">Which system suits this site? <i>*</i></span>
+          <div className="suggest-opts">
+            {([['on_grid', 'On-grid', 'Connected to the electricity grid. Lowest cost, qualifies for subsidy, no batteries.'], ['off_grid', 'Off-grid', 'Runs on its own with batteries. For no grid or frequent power cuts.'], ['none', 'Neither', 'Solar is not suitable here, for example heavy shade or no usable roof.']] as const).map(([v, t, d]) => (
+              <button type="button" key={v} className={f.values.suggestedSystemType === v ? 'on' : ''} onClick={() => f.set('suggestedSystemType', v)}><b>{t}</b><small>{d}</small></button>))}
+          </div>
+          {f.errors.suggestedSystemType && <span className="err">{f.errors.suggestedSystemType}</span>}
+          {f.values.suggestedSystemType && f.values.suggestedSystemType !== 'none' && f.values.suggestedSystemType !== s.system_type && <span className="hint">The customer asked for {s.system_type.replace('_', '-')}. Say why you suggest a change.</span>}
+        </div>
+        <Field label={`Why do you suggest this?${f.values.suggestedSystemType === 'none' ? ' *' : ' (optional)'}`} error={f.errors.suggestionReason} mask="text" rules={[V.safeText('Reason', 500)]} className="full"><textarea rows={2} maxLength={500} {...f.bind('suggestionReason')} placeholder="e.g. Power cuts of 4-5 hours daily, so batteries are needed" /></Field>
         <Field label="Notes" mask="text" rules={[V.safeText('Notes', 1000)]} className="full"><textarea {...f.bind('notes')} /></Field>
       </div>
     </Modal>
@@ -89,7 +99,7 @@ export default function Surveys() {
                           </span></>} /></td>
                         <td><span className="who"><Avatar name={s.technician_name} mini role="technician" />{s.technician_name}</span></td>
                         <td>{s.roof_direction ? (
-                          <div className="tags"><Tag tone="blue">Faces {s.roof_direction}</Tag><Tag>{s.roof_tilt_deg}° tilt</Tag><Tag>{s.cable_distance_m} m cable</Tag>{s.usable_area_sqft && <Tag>{s.usable_area_sqft} sq ft</Tag>}</div>
+                          <div className="tags"><Tag tone="blue">Faces {s.roof_direction}</Tag><Tag>{s.roof_tilt_deg}° tilt</Tag><Tag>{s.cable_distance_m} m cable</Tag>{s.suggested_system_type && <Tag tone="green">{s.suggested_system_type === 'none' ? 'Suggests neither' : `Suggests ${s.suggested_system_type.replace('_', '-')}`}</Tag>}{s.usable_area_sqft && <Tag>{s.usable_area_sqft} sq ft</Tag>}</div>
                         ) : <span className="muted">Not measured yet</span>}</td>
                         <td><Badge status={s.status}>{s.status === 'completed' ? 'Awaiting review' : undefined}</Badge></td>
                         <td className="right">{s.status === 'scheduled' && ['technician', 'admin'].includes(user.role) && <button className="btn sm" onClick={() => setOpen(s)}>Enter measurements</button>}

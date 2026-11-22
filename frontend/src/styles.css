@@ -1152,3 +1152,17 @@ table .req { flex-wrap: nowrap; white-space: nowrap; }
 .stock-box b { font-size: 1.5rem; letter-spacing: -.02em; line-height: 1.1; } .stock-box small { color: var(--muted); font-size: .78rem; max-width: 340px; }
 .btn.call { background: #ecfdf5; border-color: #a7f3d0; color: #047857; box-shadow: none; } .btn.call:hover { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
 .btn.call svg { stroke-width: 2.2; }
+
+.suggest { display: grid; gap: 8px; } .suggest .lbl { font-size: .82rem; font-weight: 600; color: var(--text-2); } .suggest .lbl i { color: var(--bad); font-style: normal; }
+.suggest-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.suggest-opts button { text-align: left; display: grid; gap: 3px; padding: 11px 13px; border-radius: 12px; border: 1.5px solid var(--border-strong); background: #fff; cursor: pointer; font: inherit; color: var(--text); transition: border-color .15s, background .15s, box-shadow .15s; }
+.suggest-opts button small { color: var(--muted); font-size: .76rem; line-height: 1.35; }
+.suggest-opts button:hover { border-color: var(--primary); }
+.suggest-opts button.on { border-color: var(--primary); background: #f3f2ff; box-shadow: 0 0 0 3px rgba(99, 91, 255, .14); }
+@media (max-width: 520px) { .suggest-opts { grid-template-columns: 1fr; } }
+.suggest .err { color: var(--bad); font-size: .78rem; } .suggest .hint { color: var(--muted); font-size: .78rem; }
+
+.seg-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seg-pick button { text-align: left; display: grid; gap: 2px; padding: 10px 13px; border-radius: 12px; border: 1.5px solid var(--border-strong); background: #fff; cursor: pointer; font: inherit; font-weight: 600; color: var(--text); min-height: 58px; }
+.seg-pick button small { color: var(--primary); font-size: .72rem; font-weight: 600; } .seg-pick button:hover { border-color: var(--primary); }
+.seg-pick button.on { border-color: var(--primary); background: #f3f2ff; box-shadow: 0 0 0 3px rgba(99, 91, 255, .14); }

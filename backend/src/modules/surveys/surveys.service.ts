@@ -1,7 +1,7 @@
 import { notify, notifyUsers } from '../../realtime/socket';
 import { forbidden, notFound, unprocessable } from '../../lib/errors';
 import type { AuthUser } from '../../lib/http';
-import { logActivity, tx } from '../../lib/prisma';
+import { exec, logActivity, q1, tx } from '../../lib/prisma';
 import { availabilityService } from '../availability/availability.service';
 import { surveysRepository as repo } from './surveys.repository';
 import type { CompleteSurveyInput, ReviewSurveyInput, ScheduleSurveyInput } from './surveys.schema';
@@ -38,7 +38,7 @@ export const surveysService = {
       if (user.role === 'technician' && s.technician_id !== user.id) throw forbidden('This survey is assigned to another technician');
       if (s.status !== 'scheduled') throw unprocessable('This survey has already been submitted');
       const row = await repo.complete(db, id, d);
-      await logActivity(db, 'enquiry', s.enquiry_id, 'survey_submitted', user.id);
+      await logActivity(db, 'enquiry', s.enquiry_id, 'survey_submitted', user.id, { suggested: d.suggestedSystemType });
       return { row, enquiryId: s.enquiry_id as number };
     }).then(({ row, enquiryId }) => {
       notify(['sales'], 'survey:submitted', { title: 'A site survey was submitted and needs your review', link: `/enquiries/${enquiryId}` });
@@ -54,6 +54,13 @@ export const surveysService = {
       if (s.status !== 'completed') throw unprocessable('Only submitted surveys can be reviewed');
       const approve = d.decision === 'approve';
       const row = await repo.review(db, id, approve ? 'approved' : 'rejected', userId, d.notes ?? null);
+      if (approve && d.systemType) {
+        const cur = await q1<{ system_type: string }>(db, 'SELECT system_type FROM enquiries WHERE id = $1', [s.enquiry_id]);
+        if (cur && cur.system_type !== d.systemType) {
+          await exec(db, 'UPDATE enquiries SET system_type = $2::system_type WHERE id = $1', [s.enquiry_id, d.systemType]);
+          await logActivity(db, 'enquiry', s.enquiry_id, 'system_type_changed', userId, { from: cur.system_type, to: d.systemType });
+        }
+      }
       // Rejected: back to "qualified" so a fresh visit can be booked
       await repo.setEnquiryStatus(db, s.enquiry_id, approve ? 'survey_approved' : 'qualified');
       await logActivity(db, 'enquiry', s.enquiry_id, approve ? 'survey_approved' : 'survey_rejected', userId, { notes: d.notes });

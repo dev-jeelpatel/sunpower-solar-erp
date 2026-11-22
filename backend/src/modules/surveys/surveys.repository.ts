@@ -27,8 +27,8 @@ export const surveysRepository = {
     q1(
       db,
       `UPDATE surveys SET status = 'completed', roof_direction = $2, roof_tilt_deg = $3, cable_distance_m = $4,
-              usable_area_sqft = $5, notes = $6, completed_at = now() WHERE id = $1 RETURNING *`,
-      [id, d.roofDirection, d.roofTiltDeg, d.cableDistanceM, d.usableAreaSqft, d.notes ?? null],
+              usable_area_sqft = $5, notes = $6, suggested_system_type = $7, suggestion_reason = $8, completed_at = now() WHERE id = $1 RETURNING *`,
+      [id, d.roofDirection, d.roofTiltDeg, d.cableDistanceM, d.usableAreaSqft, d.notes ?? null, d.suggestedSystemType, d.suggestionReason ?? null],
     ),
   review: (db: Db, id: number, status: string, userId: number, notes: string | null) =>
     q1(db, 'UPDATE surveys SET status = $2::survey_status, reviewed_by = $3, review_notes = $4 WHERE id = $1 RETURNING *', [id, status, userId, notes]),
